@@ -4,14 +4,13 @@ CSCI 251: Concepts of Parallel and Distributed Systems
 
 ## Team Information
 
-**Team Name:** [Your Team Name]
+**Team Name:** Group 5
 
 **Team Members:**
-- [Name 1]
-- [Name 2]
-- [Name 3]
-- [Name 4]
-- [Name 5]
+- Alia Ulanbek Kyzy
+- Michael Reizenstein
+- Sean Gaines
+- Willow Rimlinger
 
 ## Build Instructions
 
