@@ -58,7 +58,13 @@ public class ConsoleUI
     /// </summary>
     public void ShowHelp()
     {
-        throw new NotImplementedException("Implement ShowHelp() - see TODO in comments above");
+        Console.WriteLine("\nAvailable Commands:");
+        Console.WriteLine("  /connect <ip> <port>  - Connect to a peer");
+        Console.WriteLine("  /listen <port>        - Start listening for connections");
+        Console.WriteLine("  /peers                - List connected peers");
+        Console.WriteLine("  /history              - View message history");
+        Console.WriteLine("  /quit                 - Exit the application");
+        Console.WriteLine();
     }
 
     /// <summary>

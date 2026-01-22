@@ -52,10 +52,10 @@ class Program
 {
     // TODO: Declare your components as fields if needed for access across methods
     // Examples:
-    // private static MessageQueue? _messageQueue;
+    private static MessageQueue? _messageQueue;
     // private static TcpServer? _tcpServer;
     // private static TcpClientHandler? _tcpClientHandler;
-    // private static ConsoleUI? _consoleUI;
+    private static ConsoleUI? _consoleUI;
     // private static CancellationTokenSource? _cancellationTokenSource;
 
     static async Task Main(string[] args)
@@ -66,7 +66,9 @@ class Program
         // TODO: Initialize components
         // 1. Create CancellationTokenSource for shutdown signaling
         // 2. Create MessageQueue for thread communication
+        _messageQueue = new MessageQueue();
         // 3. Create ConsoleUI for user interface
+        _consoleUI = new ConsoleUI(_messageQueue);
         // 4. Create TcpServer for incoming connections
         // 5. Create TcpClientHandler for outgoing connections
 
@@ -111,7 +113,7 @@ class Program
                     running = false;
                     break;
                 case "/help":
-                    ShowHelp();
+                    _consoleUI.ShowHelp(); 
                     break;
                 default:
                     Console.WriteLine("Command not yet implemented. See TODO comments.");
@@ -127,21 +129,6 @@ class Program
         // 5. Wait for background threads to finish
 
         Console.WriteLine("Goodbye!");
-    }
-
-    /// <summary>
-    /// Display help information.
-    /// This is a temporary implementation - integrate with ConsoleUI.ShowHelp()
-    /// </summary>
-    private static void ShowHelp()
-    {
-        Console.WriteLine("\nAvailable Commands:");
-        Console.WriteLine("  /connect <ip> <port>  - Connect to a peer");
-        Console.WriteLine("  /listen <port>        - Start listening for connections");
-        Console.WriteLine("  /peers                - List connected peers");
-        Console.WriteLine("  /history              - View message history");
-        Console.WriteLine("  /quit                 - Exit the application");
-        Console.WriteLine();
     }
 
     // TODO: Add helper methods as needed
