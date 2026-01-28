@@ -1,4 +1,4 @@
-// [Your Name Here]
+// Sean Gaines
 // CSCI 251 - Secure Distributed Messenger
 
 using SecureMessenger.Core;
@@ -35,7 +35,8 @@ public class ConsoleUI
     /// </summary>
     public void DisplayMessage(Message message)
     {
-        throw new NotImplementedException("Implement DisplayMessage() - see TODO in comments above");
+        Console.WriteLine(message.ToString());
+        //throw new NotImplementedException("Implement DisplayMessage() - see TODO in comments above");
     }
 
     /// <summary>
@@ -46,6 +47,7 @@ public class ConsoleUI
     /// </summary>
     public void DisplaySystem(string message)
     {
+        Console.WriteLine($"[System] {message}");
         throw new NotImplementedException("Implement DisplaySystem() - see TODO in comments above");
     }
 
