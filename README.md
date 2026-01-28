@@ -1,16 +1,8 @@
-# Secure Distributed Messenger - Starter Code
+# Secure Distributed Messenger
 
 CSCI 251: Concepts of Parallel and Distributed Systems
 
-## Team Information
-
-**Team Name:** Group 5
-
-**Team Members:**
-- Alia Ulanbek Kyzy
-- Michael Reizenstein
-- Sean Gaines
-- Willow Rimlinger
+> **Note:** For sprint submissions, use the `sprint-X-documentation.md` templates provided in the templates folder. This README is for your GitHub repository reference only.
 
 ## Build Instructions
 
@@ -105,9 +97,20 @@ SecureMessenger/
 ### You Must Implement
 All methods marked with `throw new NotImplementedException()` - look for the detailed TODO comments in each method that explain exactly what to implement.
 
+## Getting Started
+
+**New to C# threading, events, or networking?** Start with `HINTS.md` - it contains:
+- How to use `Action` and events (the notification pattern used throughout)
+- How to use `BlockingCollection` for thread-safe queues
+- How threads and cancellation tokens work
+- TCP networking basics
+- **Sprint progression guide** - how to approach each sprint
+
 ## Sprint Implementation Guide
 
 ### Sprint 1: Threading & Basic Networking (Week 5)
+
+> **Tip:** Start by thinking of your app as having two separate roles: a **Server** (listens and accepts connections) and a **Client** (connects to servers). See HINTS.md for diagrams.
 
 **Files to complete:**
 - `Program.cs` - Main loop, thread creation, event handling

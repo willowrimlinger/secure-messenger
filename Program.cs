@@ -1,6 +1,11 @@
 // [Your Name Here]
 // CSCI 251 - Secure Distributed Messenger
 // Group Project
+//
+// SPRINT 1: Threading & Basic Networking
+// Due: Week 5 | Work on: Weeks 3-4
+// (Continue enhancing in Sprints 2 & 3)
+//
 
 using SecureMessenger.Core;
 using SecureMessenger.Network;
