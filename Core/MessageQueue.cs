@@ -109,14 +109,14 @@ public class MessageQueue
     ///
     /// TODO: Return the count of your incoming queue
     /// </summary>
-    public int IncomingCount => throw new NotImplementedException("Implement IncomingCount property");
+    public int IncomingCount => _incomingQueue.Count; 
 
     /// <summary>
     /// Get the count of outgoing messages waiting to be sent.
     ///
     /// TODO: Return the count of your outgoing queue
     /// </summary>
-    public int OutgoingCount => throw new NotImplementedException("Implement OutgoingCount property");
+    public int OutgoingCount => _outgoingQueue.Count;
 
     /// <summary>
     /// Signal that no more messages will be added.
