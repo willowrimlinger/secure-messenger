@@ -70,12 +70,15 @@ class Program
 
         // TODO: Initialize components
         // 1. Create CancellationTokenSource for shutdown signaling
+        _cancellationTokenSource = new CancellationTokenSource(); 
         // 2. Create MessageQueue for thread communication
         _messageQueue = new MessageQueue();
         // 3. Create ConsoleUI for user interface
         _consoleUI = new ConsoleUI(_messageQueue);
         // 4. Create TcpServer for incoming connections
+        _tcpServer = new TcpServer(); 
         // 5. Create TcpClientHandler for outgoing connections
+        _tcpClientHandler = new TcpClientHandler(); 
 
         // TODO: Subscribe to events
         // 1. TcpServer.OnPeerConnected - handle new incoming connections
