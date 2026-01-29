@@ -48,7 +48,6 @@ public class TcpServer
     /// <summary>
     /// Main loop that accepts incoming connections.
     ///
-    /// TODO: Implement the following:
     /// 1. Loop while cancellation is not requested
     /// 2. Check if a connection is pending using _listener.Pending()
     /// 3. If pending, accept the connection with AcceptTcpClient()
@@ -58,7 +57,23 @@ public class TcpServer
     /// </summary>
     private void ListenLoop()
     {
-        throw new NotImplementedException("Implement ListenLoop() - see TODO in comments above");
+        if (this._cancellationTokenSource is null || this._listener is null) {
+            throw new NullReferenceException("Must call Start() before invoking ListenLoop");
+        }
+        while (!this._cancellationTokenSource.Token.IsCancellationRequested) {
+            try {
+                if (this._listener.Pending()) {
+                    TcpClient client = this._listener.AcceptTcpClient();
+                    this.HandleNewConnection(client);
+                } else {
+                    Thread.Sleep(100);
+                }
+            } catch (SocketException e) {
+                Console.WriteLine("SocketException: {0}", e); // TODO hook this up to ConsoleUI method?
+            } catch (IOException e) {
+                Console.WriteLine("IOException: {0}", e); // TODO hook this up to ConsoleUI method?
+            }
+        }
     }
 
     /// <summary>
