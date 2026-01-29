@@ -81,6 +81,59 @@ public class ConsoleUI
     /// </summary>
     public CommandResult ParseCommand(string input)
     {
+        // if input is not a command, return as message
+        if (!input.StartsWith("/"))
+        {
+            return new CommandResult { IsCommand = false, Message = input };
+        }
+        // if command, parse it
+        var parts = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var command = parts[0].ToLower();
+
+        switch (command)
+        {
+            case "/connect":
+                return new CommandResult 
+                {
+                    IsCommand = true,
+                    CommandType = CommandType.Connect,
+                    Args = parts[1..].toArray();
+                };
+            case "/listen":
+                return new CommandResult 
+                {
+                    IsCommand = true,
+                    CommandType = CommandType.Listen,
+                    Args = parts[1..].toArray();
+                };
+            case "/peers":
+                return new CommandResult
+                {
+                    IsCommand = true, 
+                    CommandType = CommandType.ListPeers;
+                };
+            case "/history":
+                return new CommandResult
+                {
+                    IsCommand = true, 
+                    CommandType = CommandType.Quit;
+                };
+            case "/quit":
+            case "/exit":
+                return new CommandResult
+                {
+                    IsCommand = true, 
+                    CommandType = CommandType.History;
+                };
+            default:
+                return new CommandResult
+                {
+                    IsCommand = true, 
+                    CommandType = CommandType.Unknown,
+                    Message = $"Unknown command: {command}";
+                };
+        }
+
         throw new NotImplementedException("Implement ParseCommand() - see TODO in comments above");
     }
 }
