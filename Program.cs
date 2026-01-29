@@ -82,9 +82,16 @@ class Program
 
         // TODO: Subscribe to events
         // 1. TcpServer.OnPeerConnected - handle new incoming connections
+        _tcpServer.OnPeerConnected += (peer) => {};
         // 2. TcpServer.OnMessageReceived - handle received messages
+        _tcpServer.OnMessageReceived += (peer, message) => {}; 
         // 3. TcpServer.OnPeerDisconnected - handle disconnections
+        _tcpServer.OnPeerConnected += (peer) => {}; 
+
         // 4. TcpClientHandler events (same pattern)
+        _tcpClientHandler.OnConnected += (peer) => {};
+        _tcpClientHandler.OnDisconnected += (peer) => {};
+        _tcpClientHandler.OnMessageReceived += (peer, message) => {};
 
         // TODO: Start background threads
         // 1. Start a thread/task for processing incoming messages
