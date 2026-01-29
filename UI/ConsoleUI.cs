@@ -1,4 +1,4 @@
-// [Your Name Here]
+// Sean Gaines
 // CSCI 251 - Secure Distributed Messenger
 
 using SecureMessenger.Core;
@@ -35,7 +35,8 @@ public class ConsoleUI
     /// </summary>
     public void DisplayMessage(Message message)
     {
-        throw new NotImplementedException("Implement DisplayMessage() - see TODO in comments above");
+        Console.WriteLine(message.ToString());
+        //throw new NotImplementedException("Implement DisplayMessage() - see TODO in comments above");
     }
 
     /// <summary>
@@ -46,6 +47,7 @@ public class ConsoleUI
     /// </summary>
     public void DisplaySystem(string message)
     {
+        Console.WriteLine($"[System] {message}");
         throw new NotImplementedException("Implement DisplaySystem() - see TODO in comments above");
     }
 
@@ -58,7 +60,13 @@ public class ConsoleUI
     /// </summary>
     public void ShowHelp()
     {
-        throw new NotImplementedException("Implement ShowHelp() - see TODO in comments above");
+        Console.WriteLine("\nAvailable Commands:");
+        Console.WriteLine("  /connect <ip> <port>  - Connect to a peer");
+        Console.WriteLine("  /listen <port>        - Start listening for connections");
+        Console.WriteLine("  /peers                - List connected peers");
+        Console.WriteLine("  /history              - View message history");
+        Console.WriteLine("  /quit                 - Exit the application");
+        Console.WriteLine();
     }
 
     /// <summary>

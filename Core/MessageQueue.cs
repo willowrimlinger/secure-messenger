@@ -1,4 +1,4 @@
-// [Your Name Here]
+// Sean Gaines
 // CSCI 251 - Secure Distributed Messenger
 
 using System.Collections.Concurrent;
@@ -23,105 +23,68 @@ namespace SecureMessenger.Core;
 /// </summary>
 public class MessageQueue
 {
-    // TODO: Choose your thread-safe collection(s)
-    // Option 1: BlockingCollection<Message> (recommended)
-    // Option 2: ConcurrentQueue<Message>
-    // Option 3: Queue<Message> with lock
+    BlockingCollection<Message> _incomingQueue = new BlockingCollection<Message>(); 
+    BlockingCollection<Message> _outgoingQueue = new BlockingCollection<Message>(); 
 
     /// <summary>
     /// Enqueue an incoming message (received from network).
-    ///
-    /// TODO: Implement the following:
-    /// 1. Add the message to your incoming queue
-    /// 2. Ensure thread safety (depends on your collection choice)
     /// </summary>
     public void EnqueueIncoming(Message message)
     {
-        throw new NotImplementedException("Implement EnqueueIncoming() - see TODO in comments above");
+        _incomingQueue.Add(message); 
     }
 
     /// <summary>
     /// Dequeue an incoming message for processing.
     /// This method should BLOCK if the queue is empty.
-    ///
-    /// TODO: Implement the following:
-    /// 1. Take a message from the incoming queue
-    /// 2. Block if the queue is empty (don't busy-wait)
-    /// 3. Support cancellation via the CancellationToken
-    ///
-    /// Hint: BlockingCollection.Take() does this automatically
     /// </summary>
     public Message DequeueIncoming(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException("Implement DequeueIncoming() - see TODO in comments above");
+        return _incomingQueue.Take(cancellationToken);
     }
 
     /// <summary>
     /// Try to dequeue an incoming message without blocking.
-    ///
-    /// TODO: Implement the following:
-    /// 1. Attempt to take a message from the incoming queue
-    /// 2. Return true if successful, false if queue is empty
-    /// 3. Set 'message' to the dequeued message or null
-    ///
-    /// Hint: BlockingCollection.TryTake() does this
     /// </summary>
     public bool TryDequeueIncoming(out Message? message)
     {
-        throw new NotImplementedException("Implement TryDequeueIncoming() - see TODO in comments above");
+        return _incomingQueue.TryTake(out message);
     }
 
     /// <summary>
     /// Enqueue an outgoing message (to be sent to network).
-    ///
-    /// TODO: Implement the following:
-    /// 1. Add the message to your outgoing queue
-    /// 2. Ensure thread safety
     /// </summary>
     public void EnqueueOutgoing(Message message)
     {
-        throw new NotImplementedException("Implement EnqueueOutgoing() - see TODO in comments above");
+        _outgoingQueue.Add(message);
     }
 
     /// <summary>
     /// Dequeue an outgoing message for sending.
     /// This method should BLOCK if the queue is empty.
-    ///
-    /// TODO: Implement the following:
-    /// 1. Take a message from the outgoing queue
-    /// 2. Block if the queue is empty
-    /// 3. Support cancellation via the CancellationToken
     /// </summary>
     public Message DequeueOutgoing(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException("Implement DequeueOutgoing() - see TODO in comments above");
+        return _outgoingQueue.Take(cancellationToken);
     }
 
     /// <summary>
     /// Get the count of incoming messages waiting to be processed.
-    ///
-    /// TODO: Return the count of your incoming queue
     /// </summary>
-    public int IncomingCount => throw new NotImplementedException("Implement IncomingCount property");
+    public int IncomingCount => _incomingQueue.Count; 
 
     /// <summary>
     /// Get the count of outgoing messages waiting to be sent.
-    ///
-    /// TODO: Return the count of your outgoing queue
     /// </summary>
-    public int OutgoingCount => throw new NotImplementedException("Implement OutgoingCount property");
+    public int OutgoingCount => _outgoingQueue.Count;
 
     /// <summary>
     /// Signal that no more messages will be added.
     /// Call this during shutdown to unblock waiting consumers.
-    ///
-    /// TODO: Implement the following:
-    /// 1. Mark both queues as complete (no more additions)
-    ///
-    /// Hint: BlockingCollection.CompleteAdding() does this
     /// </summary>
     public void CompleteAdding()
     {
-        throw new NotImplementedException("Implement CompleteAdding() - see TODO in comments above");
+        _outgoingQueue.CompleteAdding(); 
+        _incomingQueue.CompleteAdding(); 
     }
 }
