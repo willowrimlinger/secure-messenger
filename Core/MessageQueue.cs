@@ -1,4 +1,4 @@
-// [Your Name Here]
+// Sean Gaines
 // CSCI 251 - Secure Distributed Messenger
 
 using System.Collections.Concurrent;
@@ -27,6 +27,8 @@ public class MessageQueue
     // Option 1: BlockingCollection<Message> (recommended)
     // Option 2: ConcurrentQueue<Message>
     // Option 3: Queue<Message> with lock
+    BlockingCollection<Message> _incomingQueue = new BlockingCollection<Message>(); 
+    BlockingCollection<Message> _outgoingQueue = new BlockingCollection<Message>(); 
 
     /// <summary>
     /// Enqueue an incoming message (received from network).
@@ -37,7 +39,8 @@ public class MessageQueue
     /// </summary>
     public void EnqueueIncoming(Message message)
     {
-        throw new NotImplementedException("Implement EnqueueIncoming() - see TODO in comments above");
+        _incomingQueue.Add(message); 
+        //throw new NotImplementedException("Implement EnqueueIncoming() - see TODO in comments above");
     }
 
     /// <summary>
@@ -53,7 +56,8 @@ public class MessageQueue
     /// </summary>
     public Message DequeueIncoming(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException("Implement DequeueIncoming() - see TODO in comments above");
+        return _incomingQueue.Take(cancellationToken);
+        //throw new NotImplementedException("Implement DequeueIncoming() - see TODO in comments above");
     }
 
     /// <summary>
@@ -68,7 +72,8 @@ public class MessageQueue
     /// </summary>
     public bool TryDequeueIncoming(out Message? message)
     {
-        throw new NotImplementedException("Implement TryDequeueIncoming() - see TODO in comments above");
+        return _incomingQueue.TryTake(out message);
+        //throw new NotImplementedException("Implement TryDequeueIncoming() - see TODO in comments above");
     }
 
     /// <summary>
@@ -80,7 +85,8 @@ public class MessageQueue
     /// </summary>
     public void EnqueueOutgoing(Message message)
     {
-        throw new NotImplementedException("Implement EnqueueOutgoing() - see TODO in comments above");
+        _outgoingQueue.Add(message);
+        //throw new NotImplementedException("Implement EnqueueOutgoing() - see TODO in comments above");
     }
 
     /// <summary>
@@ -94,7 +100,8 @@ public class MessageQueue
     /// </summary>
     public Message DequeueOutgoing(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException("Implement DequeueOutgoing() - see TODO in comments above");
+        return _outgoingQueue.Take(cancellationToken);
+        //throw new NotImplementedException("Implement DequeueOutgoing() - see TODO in comments above");
     }
 
     /// <summary>
@@ -122,6 +129,8 @@ public class MessageQueue
     /// </summary>
     public void CompleteAdding()
     {
-        throw new NotImplementedException("Implement CompleteAdding() - see TODO in comments above");
+        _outgoingQueue.CompleteAdding(); 
+        _incomingQueue.CompleteAdding(); 
+        //throw new NotImplementedException("Implement CompleteAdding() - see TODO in comments above");
     }
 }
