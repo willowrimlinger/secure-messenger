@@ -28,7 +28,6 @@ public class TcpServer
     /// <summary>
     /// Start listening for incoming connections on the specified port.
     ///
-    /// TODO: Implement the following:
     /// 1. Store the port number
     /// 2. Create a new CancellationTokenSource
     /// 3. Create and start a TcpListener on IPAddress.Any and the specified port
@@ -38,7 +37,12 @@ public class TcpServer
     /// </summary>
     public void Start(int port)
     {
-        throw new NotImplementedException("Implement Start() - see TODO in comments above");
+        this.Port = port;
+        this._cancellationTokenSource = new CancellationTokenSource();
+        this._listener = new TcpListener(IPAddress.Any, port);
+        this.IsListening = true;
+        this._listenThread = new Thread(ListenLoop);
+        Console.WriteLine("Server is listening..."); // TODO hook this up to ConsoleUI method?
     }
 
     /// <summary>
