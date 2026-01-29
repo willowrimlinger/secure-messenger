@@ -58,10 +58,10 @@ class Program
     // TODO: Declare your components as fields if needed for access across methods
     // Examples:
     private static MessageQueue? _messageQueue;
-    // private static TcpServer? _tcpServer;
-    // private static TcpClientHandler? _tcpClientHandler;
+    private static TcpServer? _tcpServer;
+    private static TcpClientHandler? _tcpClientHandler;
     private static ConsoleUI? _consoleUI;
-    // private static CancellationTokenSource? _cancellationTokenSource;
+    private static CancellationTokenSource? _cancellationTokenSource;
 
     static async Task Main(string[] args)
     {
