@@ -15,6 +15,7 @@ public class TcpServer
 {
     private TcpListener? _listener;
     private readonly List<Peer> _connectedPeers = new();
+    private object _connectedPeersLock = new object();
     private CancellationTokenSource? _cancellationTokenSource;
     private Thread? _listenThread;
 
@@ -92,7 +93,20 @@ public class TcpServer
     /// </summary>
     private void HandleNewConnection(TcpClient client)
     {
-        throw new NotImplementedException("Implement HandleNewConnection() - see TODO in comments above");
+        if (client.Client.RemoteEndPoint is null) {
+            throw new NullReferenceException("Client must have a remote endpoint assigned");
+        }
+
+        Peer peer = new Peer();
+        peer.Client = client;
+        peer.Stream = client.GetStream();
+        peer.Address = ((IPEndPoint) client.Client.RemoteEndPoint).Address;
+        peer.Port = ((IPEndPoint) client.Client.RemoteEndPoint).Port;
+        peer.IsConnected = true;
+
+        lock (_connectedPeersLock) {
+            this._connectedPeers.Add(peer);
+        }
     }
 
     /// <summary>
