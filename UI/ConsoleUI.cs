@@ -105,44 +105,42 @@ public class ConsoleUI
                 {
                     IsCommand = true,
                     CommandType = CommandType.Connect,
-                    Args = parts[1..].toArray();
+                    Args = parts[1..].ToArray()
                 };
             case "/listen":
                 return new CommandResult 
                 {
                     IsCommand = true,
                     CommandType = CommandType.Listen,
-                    Args = parts[1..].toArray();
+                    Args = parts[1..].ToArray()
                 };
             case "/peers":
                 return new CommandResult
                 {
                     IsCommand = true, 
-                    CommandType = CommandType.ListPeers;
+                    CommandType = CommandType.ListPeers
                 };
             case "/history":
                 return new CommandResult
                 {
                     IsCommand = true, 
-                    CommandType = CommandType.Quit;
+                    CommandType = CommandType.History
                 };
             case "/quit":
             case "/exit":
                 return new CommandResult
                 {
                     IsCommand = true, 
-                    CommandType = CommandType.History;
+                    CommandType = CommandType.Quit
                 };
             default:
                 return new CommandResult
                 {
                     IsCommand = true, 
                     CommandType = CommandType.Unknown,
-                    Message = $"Unknown command: {command}";
+                    Message = $"Unknown command: {command}"
                 };
-        }
-
-        throw new NotImplementedException("Implement ParseCommand() - see TODO in comments above");
+        };
     }
 }
 

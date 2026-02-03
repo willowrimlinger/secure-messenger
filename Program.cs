@@ -55,8 +55,15 @@ namespace SecureMessenger;
 /// </summary>
 class Program
 {
+
     // TODO: Declare your components as fields if needed for access across methods
     // Examples:
+    // [X] private static MessageQueue? _messageQueue;
+    // [X] private static TcpServer? _tcpServer;
+    // [X] private static TcpClientHandler? _tcpClientHandler;
+    // [X] private static ConsoleUI? _consoleUI;
+    // [X] private static CancellationTokenSource? _cancellationTokenSource;
+
     private static MessageQueue? _messageQueue;
     private static TcpServer? _tcpServer;
     private static TcpClientHandler? _tcpClientHandler;
@@ -78,7 +85,11 @@ class Program
         // 4. Create TcpServer for incoming connections
         _tcpServer = new TcpServer(); 
         // 5. Create TcpClientHandler for outgoing connections
-        _tcpClientHandler = new TcpClientHandler(); 
+
+        _messageQueue = new MessageQueue();
+        _consoleUI = new ConsoleUI(_messageQueue);
+        _tcpServer = new TcpServer();
+        _tcpClientHandler = new TcpClientHandler();
 
         // TODO: Subscribe to events
         // 1. TcpServer.OnPeerConnected - handle new incoming connections
@@ -106,9 +117,9 @@ class Program
         while (running)
         {
             // TODO: Implement the main input loop
-            // 1. Read a line from the console
-            // 2. Skip empty input
-            // 3. Parse the input using ConsoleUI.ParseCommand()
+            // [X] 1. Read a line from the console
+            // [X] 2. Skip empty input
+            // [X] 3. Parse the input using ConsoleUI.ParseCommand()
             // 4. Handle the command based on CommandType:
             //    - Connect: Call TcpClientHandler.ConnectAsync()
             //    - Listen: Call TcpServer.Start()
@@ -119,8 +130,7 @@ class Program
 
             var input = Console.ReadLine();
             if (string.IsNullOrEmpty(input)) continue;
-
-            // Temporary basic command handling - replace with full implementation
+            
             switch (input.ToLower())
             {
                 case "/quit":
@@ -128,7 +138,27 @@ class Program
                     running = false;
                     break;
                 case "/help":
-                    _consoleUI.ShowHelp(); 
+                    consoleUI.ShowHelp();
+                    break;
+                default:
+                    // TODO: Handle other commands and messages
+                    break;
+            }
+
+            var parsed_input = _consoleUI.ParseCommand(input);
+            if (!parsed_input.IsCommand) {
+                Console.WriteLine("TODO: not a command: Send as a message to peers")
+            }
+
+
+            switch (parsed_input.CommandType)
+            {
+                case CommandType.Quit:
+                    Console.WriteLine("In switch")
+                    running = false;
+                    break;
+                case "/help":
+                    ShowHelp();
                     break;
                 default:
                     Console.WriteLine("Command not yet implemented. See TODO comments.");
