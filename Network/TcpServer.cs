@@ -18,6 +18,8 @@ public class TcpServer
     private object _connectedPeersLock = new object();
     private CancellationTokenSource? _cancellationTokenSource;
     private Thread? _listenThread;
+    private List<Thread> _receiveThreads = new();
+    private object _receiveThreadsLock = new object();
 
     public event Action<Peer>? OnPeerConnected;
     public event Action<Peer>? OnPeerDisconnected;
@@ -80,7 +82,6 @@ public class TcpServer
     /// <summary>
     /// Handle a new incoming connection by creating a Peer and starting its receive thread.
     ///
-    /// TODO: Implement the following:
     /// 1. Create a new Peer object with:
     ///    - Client = the TcpClient
     ///    - Stream = client.GetStream()
@@ -96,6 +97,9 @@ public class TcpServer
         if (client.Client.RemoteEndPoint is null) {
             throw new NullReferenceException("Client must have a remote endpoint assigned");
         }
+        if (this.OnPeerConnected is null) {
+            throw new NullReferenceException("OnPeerConnected is null");
+        }
 
         Peer peer = new Peer();
         peer.Client = client;
@@ -107,12 +111,16 @@ public class TcpServer
         lock (_connectedPeersLock) {
             this._connectedPeers.Add(peer);
         }
+
+        this.OnPeerConnected(peer);
+        lock (_receiveThreadsLock) {
+            this._receiveThreads.Add(new Thread(() => ReceiveLoop(peer)));
+        }
     }
 
     /// <summary>
     /// Receive loop for a specific peer - reads messages until disconnection.
     ///
-    /// TODO: Implement the following:
     /// 1. Create a StreamReader from the peer's stream
     /// 2. Loop while peer is connected and cancellation not requested
     /// 3. Read a line from the stream (ReadLine blocks until data available)
@@ -124,13 +132,39 @@ public class TcpServer
     /// </summary>
     private void ReceiveLoop(Peer peer)
     {
-        throw new NotImplementedException("Implement ReceiveLoop() - see TODO in comments above");
+        if (peer.Stream is null) {
+            throw new NullReferenceException("Peer does not have a stream to receive from");
+        }
+        if (this._cancellationTokenSource is null) {
+            throw new NullReferenceException("_cancellationTokenSource is null");
+        }
+        if (this.OnMessageReceived is null) {
+            throw new NullReferenceException("OnMessageReceived is null");
+        }
+
+        try {
+            var streamReader = new StreamReader(peer.Stream);
+
+            while (peer.IsConnected && !this._cancellationTokenSource.Token.IsCancellationRequested) {
+                var line = streamReader.ReadLine();
+                if (line is null) {
+                    // connection closed
+                    break;
+                }
+                var message = new Message();
+                message.Content = line;
+                this.OnMessageReceived(peer, message);
+            }
+        } catch (IOException e) {
+            Console.WriteLine("IOException: {0}", e); // TODO hook this up to ConsoleUI method?
+        } finally {
+            this.DisconnectPeer(peer);
+        }
     }
 
     /// <summary>
     /// Clean up a disconnected peer.
     ///
-    /// TODO: Implement the following:
     /// 1. Set peer.IsConnected to false
     /// 2. Dispose the peer's Client and Stream
     /// 3. Remove the peer from _connectedPeers (with proper locking)
@@ -138,13 +172,24 @@ public class TcpServer
     /// </summary>
     private void DisconnectPeer(Peer peer)
     {
-        throw new NotImplementedException("Implement DisconnectPeer() - see TODO in comments above");
+        peer.IsConnected = false;
+        if (peer.Client is not null) {
+            peer.Client.Dispose();
+        }
+        if (peer.Stream is not null) {
+            peer.Stream.Dispose();
+        }
+        lock (this._connectedPeersLock) {
+            this._connectedPeers.Remove(peer);
+        }
+        if (this.OnPeerConnected is not null) {
+            this.OnPeerConnected(peer);
+        }
     }
 
     /// <summary>
     /// Stop the server and close all connections.
     ///
-    /// TODO: Implement the following:
     /// 1. Cancel the cancellation token
     /// 2. Stop the listener
     /// 3. Set IsListening to false
@@ -153,7 +198,19 @@ public class TcpServer
     /// </summary>
     public void Stop()
     {
-        throw new NotImplementedException("Implement Stop() - see TODO in comments above");
+        if (this._cancellationTokenSource is not null) {
+            this._cancellationTokenSource.Cancel();
+        }
+        if (this._listener is not null) {
+            this._listener.Stop();
+        }
+        this.IsListening = false;
+        lock (this._connectedPeersLock) {
+            this._connectedPeers.Clear();
+        }
+        if (this._listenThread is not null) {
+            this._listenThread.Join();
+        }
     }
 
     /// <summary>
