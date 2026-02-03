@@ -55,13 +55,20 @@ namespace SecureMessenger;
 /// </summary>
 class Program
 {
+
     // TODO: Declare your components as fields if needed for access across methods
     // Examples:
-    // private static MessageQueue? _messageQueue;
-    // private static TcpServer? _tcpServer;
-    // private static TcpClientHandler? _tcpClientHandler;
-    // private static ConsoleUI? _consoleUI;
-    // private static CancellationTokenSource? _cancellationTokenSource;
+    // [X] private static MessageQueue? _messageQueue;
+    // [X] private static TcpServer? _tcpServer;
+    // [X] private static TcpClientHandler? _tcpClientHandler;
+    // [X] private static ConsoleUI? _consoleUI;
+    // [X] private static CancellationTokenSource? _cancellationTokenSource;
+
+    private static MessageQueue? _messageQueue;
+    private static TcpServer? _tcpServer;
+    private static TcpClientHandler? _tcpClientHandler;
+    private static ConsoleUI? _consoleUI;
+    private static CancellationTokenSource? _cancellationTokenSource;
 
     static async Task Main(string[] args)
     {
@@ -74,6 +81,11 @@ class Program
         // 3. Create ConsoleUI for user interface
         // 4. Create TcpServer for incoming connections
         // 5. Create TcpClientHandler for outgoing connections
+
+        _messageQueue = new MessageQueue();
+        _consoleUI = new ConsoleUI(_messageQueue);
+        _tcpServer = new TcpServer();
+        _tcpClientHandler = new TcpClientHandler();
 
         // TODO: Subscribe to events
         // 1. TcpServer.OnPeerConnected - handle new incoming connections
@@ -94,9 +106,9 @@ class Program
         while (running)
         {
             // TODO: Implement the main input loop
-            // 1. Read a line from the console
-            // 2. Skip empty input
-            // 3. Parse the input using ConsoleUI.ParseCommand()
+            // [X] 1. Read a line from the console
+            // [X] 2. Skip empty input
+            // [X] 3. Parse the input using ConsoleUI.ParseCommand()
             // 4. Handle the command based on CommandType:
             //    - Connect: Call TcpClientHandler.ConnectAsync()
             //    - Listen: Call TcpServer.Start()
@@ -107,12 +119,31 @@ class Program
 
             var input = Console.ReadLine();
             if (string.IsNullOrEmpty(input)) continue;
-
-            // Temporary basic command handling - replace with full implementation
+            
             switch (input.ToLower())
             {
                 case "/quit":
                 case "/exit":
+                    running = false;
+                    break;
+                case "/help":
+                    consoleUI.ShowHelp();
+                    break;
+                default:
+                    // TODO: Handle other commands and messages
+                    break;
+            }
+
+            var parsed_input = _consoleUI.ParseCommand(input);
+            if (!parsed_input.IsCommand) {
+                Console.WriteLine("TODO: not a command: Send as a message to peers")
+            }
+
+
+            switch (parsed_input.CommandType)
+            {
+                case CommandType.Quit:
+                    Console.WriteLine("In switch")
                     running = false;
                     break;
                 case "/help":
