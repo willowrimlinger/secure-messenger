@@ -79,9 +79,7 @@ class Program
         // 1. Create CancellationTokenSource for shutdown signaling
         _cancellationTokenSource = new CancellationTokenSource(); 
         // 2. Create MessageQueue for thread communication
-        _messageQueue = new MessageQueue();
         // 3. Create ConsoleUI for user interface
-        _consoleUI = new ConsoleUI(_messageQueue);
         // 4. Create TcpServer for incoming connections
         _tcpServer = new TcpServer(); 
         // 5. Create TcpClientHandler for outgoing connections
@@ -133,10 +131,6 @@ class Program
             
             switch (input.ToLower())
             {
-                case "/quit":
-                case "/exit":
-                    running = false;
-                    break;
                 case "/help":
                     consoleUI.ShowHelp();
                     break;
@@ -161,7 +155,33 @@ class Program
                     ShowHelp();
                     break;
                 default:
-                    Console.WriteLine("Command not yet implemented. See TODO comments.");
+
+                    var parsed_input = _consoleUI.ParseCommand(input);
+                    if (!parsed_input.IsCommand) {
+                        Console.WriteLine("TODO: not a command: Send as a message to peers");
+                    }
+
+                    switch (parsed_input.CommandType)
+                    {
+                        case CommandType.Connect:
+                            _tcpClientHandler.ConnectAsync(parsed_input.Args[0], parsed_input.Args[1]);
+                            break;
+                        case CommandType.Listen:
+                            _tcpServer.Start(parsed_input.Args[0]);
+                            break;
+                        case CommandType.ListPeers:
+                            break;
+                        case CommandType.History:
+                            break;
+                        case CommandType.Quit:
+                            running = false;
+                            break;
+                        case CommandType.Unknown:
+                            Console.WriteLine($"\n{parsed_input.Message}. Please try again!\n");
+                            break;
+                        default:
+                            break;
+                    }
                     break;
             }
         }
