@@ -56,17 +56,17 @@ namespace SecureMessenger;
 class Program
 {
 
-    // TODO: Declare your components as fields if needed for access across methods
+    // [X] TODO: Declare your components as fields if needed for access across methods
     // Examples:
     // [X] private static MessageQueue? _messageQueue;
-    // [X] private static TcpServer? _tcpServer;
-    // [X] private static TcpClientHandler? _tcpClientHandler;
+    // [X] private static TcpServer? _server;
+    // [X] private static TcpClientHandler? _client;
     // [X] private static ConsoleUI? _consoleUI;
     // [X] private static CancellationTokenSource? _cancellationTokenSource;
 
     private static MessageQueue? _messageQueue;
-    private static TcpServer? _tcpServer;
-    private static TcpClientHandler? _tcpClientHandler;
+    private static TcpServer? _server;
+    private static TcpClientHandler? _client;
     private static ConsoleUI? _consoleUI;
     private static CancellationTokenSource? _cancellationTokenSource;
 
@@ -75,19 +75,17 @@ class Program
         Console.WriteLine("Secure Distributed Messenger");
         Console.WriteLine("============================");
 
-        // TODO: Initialize components
-        // 1. Create CancellationTokenSource for shutdown signaling
-        _cancellationTokenSource = new CancellationTokenSource(); 
-        // 2. Create MessageQueue for thread communication
-        // 3. Create ConsoleUI for user interface
-        // 4. Create TcpServer for incoming connections
-        _tcpServer = new TcpServer(); 
-        // 5. Create TcpClientHandler for outgoing connections
+        // [X] TODO: Initialize components
+        // [X] 1. Create CancellationTokenSource for shutdown signaling
+        // [X] 2. Create MessageQueue for thread communication
+        // [X] 3. Create ConsoleUI for user interface
+        // [X] 4. Create TcpServer for incoming connections
+        // [X] 5. Create TcpClientHandler for outgoing connections
 
         _messageQueue = new MessageQueue();
         _consoleUI = new ConsoleUI(_messageQueue);
-        _tcpServer = new TcpServer();
-        _tcpClientHandler = new TcpClientHandler();
+        _server = new TcpServer();
+        _client = new TcpClientHandler();
 
         // TODO: Subscribe to events
         // 1. TcpServer.OnPeerConnected - handle new incoming connections
@@ -98,14 +96,33 @@ class Program
         _tcpServer.OnPeerConnected += (peer) => {}; 
 
         // 4. TcpClientHandler events (same pattern)
-        _tcpClientHandler.OnConnected += (peer) => {};
-        _tcpClientHandler.OnDisconnected += (peer) => {};
-        _tcpClientHandler.OnMessageReceived += (peer, message) => {};
+
+        _server.OnPeerConnected += (peer) => 
+        { 
+            Console.WriteLine($"Client connected: {peer}");
+        };
+
+        _server.OnMessageReceived += (peer, msg) => 
+        {
+            Console.WriteLine($"[{peer}]: {msg}");
+        };
+
+        _client.OnConnected += (peer) =>  
+        {
+            Console.WriteLine($"Connected to Server: {peer}");
+        };
+
+        _client.OnMessageReceived += (peer, msg) => 
+        {
+            Console.WriteLine($"Server: {msg}");
+        };
 
         // TODO: Start background threads
         // 1. Start a thread/task for processing incoming messages
         // 2. Start a thread/task for sending outgoing messages
         // Note: TcpServer.Start() will create its own listen thread
+
+
 
         Console.WriteLine("Type /help for available commands");
         Console.WriteLine();
@@ -164,10 +181,10 @@ class Program
                     switch (parsed_input.CommandType)
                     {
                         case CommandType.Connect:
-                            _tcpClientHandler.ConnectAsync(parsed_input.Args[0], parsed_input.Args[1]);
+                            _client.ConnectAsync(parsed_input.Args[0], parsed_input.Args[1]);
                             break;
                         case CommandType.Listen:
-                            _tcpServer.Start(parsed_input.Args[0]);
+                            _server.Start(parsed_input.Args[0]);
                             break;
                         case CommandType.ListPeers:
                             break;
