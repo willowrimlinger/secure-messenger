@@ -1,4 +1,4 @@
-// Sean Gaines
+// Sean Gaines, Alia Ulanbek Kyzy
 // CSCI 251 - Secure Distributed Messenger
 // Group Project
 //
@@ -91,10 +91,7 @@ class Program
         // TODO: Subscribe to events
         // [X] 1. TcpServer.OnPeerConnected - handle new incoming connections
         // 2. TcpServer.OnMessageReceived - handle received messages
-        _tcpServer.OnMessageReceived += (peer, message) => {}; 
         // 3. TcpServer.OnPeerDisconnected - handle disconnections
-        _tcpServer.OnPeerConnected += (peer) => {}; 
-
         // 4. TcpClientHandler events (same pattern)
 
         _server.OnPeerConnected += (peer) => 
@@ -152,7 +149,6 @@ class Program
         incomingThread.Start();
         outgoingThread.Start();
 
-
         Console.WriteLine("Type /help for available commands");
         Console.WriteLine();
 
@@ -178,27 +174,7 @@ class Program
             switch (input.ToLower())
             {
                 case "/help":
-                    consoleUI.ShowHelp();
-                    break;
-                default:
-                    // TODO: Handle other commands and messages
-                    break;
-            }
-
-            var parsed_input = _consoleUI.ParseCommand(input);
-            if (!parsed_input.IsCommand) {
-                Console.WriteLine("TODO: not a command: Send as a message to peers")
-            }
-
-
-            switch (parsed_input.CommandType)
-            {
-                case CommandType.Quit:
-                    Console.WriteLine("In switch")
-                    running = false;
-                    break;
-                case "/help":
-                    ShowHelp();
+                    _consoleUI.ShowHelp(); 
                     break;
                 default:
 
