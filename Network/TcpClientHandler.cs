@@ -102,6 +102,16 @@ public class TcpClientHandler
         throw new NotImplementedException("Implement Disconnect() - see TODO in comments above");
     }
 
+    public void DisconnectAll()
+    {
+        lock (_lock)
+        {
+            foreach (var peer in _connections.Keys) {
+                Disconnect(peer);
+            }
+        }
+    }
+
     /// <summary>
     /// Get all currently connected peers.
     /// Remember to use proper locking when accessing _connections.
