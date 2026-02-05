@@ -1,4 +1,4 @@
-// Sean Gaines, Alia Ulanbek Kyzy
+// Sean Gaines, Alia Ulanbek Kyzy, Willow Rimlinger
 // CSCI 251 - Secure Distributed Messenger
 // Group Project
 //

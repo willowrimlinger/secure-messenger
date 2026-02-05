@@ -1,4 +1,4 @@
-// [Your Name Here]
+// Willow Rimlinger
 // CSCI 251 - Secure Distributed Messenger
 
 using System.Net;
