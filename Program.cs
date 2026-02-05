@@ -186,10 +186,10 @@ class Program
                     switch (parsed_input.CommandType)
                     {
                         case CommandType.Connect:
-                            await _client!.ConnectAsync(parsed_input.Args[0], parsed_input.Args[1]);
+                            await _client!.ConnectAsync(parsed_input.Args[0], int.Parse(parsed_input.Args[1]));
                             break;
                         case CommandType.Listen:
-                            _server.Start(parsed_input.Args[0]);
+                            _server.Start(int.Parse(parsed_input.Args[0]));
                             break;
                         case CommandType.ListPeers:
                             break;
@@ -218,7 +218,7 @@ class Program
         _cancellationTokenSource.Cancel();
 
         _server?.Stop();
-        _client?.Disconnect();
+        // TODO : disconnect all clients _client?.Disconnect();
 
         incomingThread.Join();
         outgoingThread.Join();
