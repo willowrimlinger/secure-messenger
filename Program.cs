@@ -86,7 +86,7 @@ class Program
         _consoleUI = new ConsoleUI(_messageQueue);
         _server = new TcpServer();
         _client = new TcpClientHandler();
-        _cancellationTokenSource = new CancellationTokenSource()
+        _cancellationTokenSource = new CancellationTokenSource();
 
         // TODO: Subscribe to events
         // [X] 1. TcpServer.OnPeerConnected - handle new incoming connections
