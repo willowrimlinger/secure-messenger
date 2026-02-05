@@ -96,32 +96,32 @@ class Program
 
         _server.OnPeerConnected += (peer) => 
         { 
-            Console.WriteLine($"Client connected: {peer}");
+            Console.WriteLine($"{peer} connected to server");
         };
 
         _server.OnMessageReceived += (peer, msg) => 
         {
-            Console.WriteLine($"[{peer}]: {msg}");
+            _client.BroadcastAsync(msg.ToString()); // TODO do we await here?
         };
 
         _server.OnPeerDisconnected += (peer) => 
         {
-            Console.WriteLine($"Client disconnected: {peer}");
+            Console.WriteLine($"{peer} disconnected from server");
         };
 
         _client.OnConnected += (peer) =>  
         {
-            Console.WriteLine($"Connected to Server: {peer}");
+            Console.WriteLine($"Client connected to {peer}");
         };
 
         _client.OnMessageReceived += (peer, msg) => 
         {
-            Console.WriteLine($"Server: {msg}");
+            _consoleUI.DisplayMessage(msg);
         };
 
         _client.OnDisconnected += (peer) => 
         {
-            Console.WriteLine($"Disconnect from server: {peer}");
+            Console.WriteLine($"Client disconnected from {peer}");
         };
 
         // TODO: Start background threads
@@ -189,7 +189,11 @@ class Program
                             await _client!.ConnectAsync(parsed_input.Args[0], int.Parse(parsed_input.Args[1]));
                             break;
                         case CommandType.Listen:
-                            _server.Start(int.Parse(parsed_input.Args[0]));
+                            if (!_server.IsListening) {
+                                _server.Start(parsed_input.Args[0]);
+                            } else {
+                                _consoleUI.DisplaySystem("Server is already listening");
+                            }
                             break;
                         case CommandType.ListPeers:
                             break;
