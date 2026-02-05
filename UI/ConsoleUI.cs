@@ -1,4 +1,4 @@
-// Sean Gaines
+// Sean Gaines, Alia Ulanbek Kyzy
 // CSCI 251 - Secure Distributed Messenger
 
 using SecureMessenger.Core;
