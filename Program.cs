@@ -86,10 +86,10 @@ class Program
         _consoleUI = new ConsoleUI(_messageQueue);
         _server = new TcpServer();
         _client = new TcpClientHandler();
+        _cancellationTokenSource = new CancellationTokenSource()
 
         // TODO: Subscribe to events
-        // 1. TcpServer.OnPeerConnected - handle new incoming connections
-        _tcpServer.OnPeerConnected += (peer) => {};
+        // [X] 1. TcpServer.OnPeerConnected - handle new incoming connections
         // 2. TcpServer.OnMessageReceived - handle received messages
         _tcpServer.OnMessageReceived += (peer, message) => {}; 
         // 3. TcpServer.OnPeerDisconnected - handle disconnections
@@ -107,6 +107,11 @@ class Program
             Console.WriteLine($"[{peer}]: {msg}");
         };
 
+        _server.OnPeerDisconnected += (peer) => 
+        {
+            Console.WriteLine($"Client disconnected: {peer}");
+        };
+
         _client.OnConnected += (peer) =>  
         {
             Console.WriteLine($"Connected to Server: {peer}");
@@ -117,11 +122,35 @@ class Program
             Console.WriteLine($"Server: {msg}");
         };
 
+        _client.OnDisconnected += (peer) => 
+        {
+            Console.WriteLine($"Disconnect from server: {peer}");
+        };
+
         // TODO: Start background threads
         // 1. Start a thread/task for processing incoming messages
         // 2. Start a thread/task for sending outgoing messages
         // Note: TcpServer.Start() will create its own listen thread
+        var incomingThread = new Thread(() =>
+        {
+            while (!_cancellationTokenSource!.IsCancellationRequested)
+            {
+                // TODO: incoming messages
+                Thread.Sleep(50);
+            }
+        });
 
+        var outgoingThread = new Thread(() =>
+        {
+            while (!_cancellationTokenSource!.IsCancellationRequested)
+            {
+                // TODO: outgoing messages
+                Thread.Sleep(50);
+            }
+        });
+
+        incomingThread.Start();
+        outgoingThread.Start();
 
 
         Console.WriteLine("Type /help for available commands");
@@ -181,7 +210,7 @@ class Program
                     switch (parsed_input.CommandType)
                     {
                         case CommandType.Connect:
-                            _client.ConnectAsync(parsed_input.Args[0], parsed_input.Args[1]);
+                            await _client!.ConnectAsync(parsed_input.Args[0], parsed_input.Args[1]);
                             break;
                         case CommandType.Listen:
                             _server.Start(parsed_input.Args[0]);
@@ -209,6 +238,14 @@ class Program
         // 3. Disconnect all clients
         // 4. Complete the MessageQueue
         // 5. Wait for background threads to finish
+
+        _cancellationTokenSource.Cancel();
+
+        _server?.Stop();
+        _client?.Disconnect();
+
+        incomingThread.Join();
+        outgoingThread.Join();
 
         Console.WriteLine("Goodbye!");
     }
