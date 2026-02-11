@@ -191,7 +191,7 @@ class Program
                             break;
                         case CommandType.Listen:
                             if (!_server.IsListening) {
-                                _server.Start(parsed_input.Args[0]);
+                                _server.Start(int.Parse(parsed_input.Args[0]));
                             } else {
                                 _consoleUI.DisplaySystem("Server is already listening");
                             }
@@ -223,7 +223,7 @@ class Program
         _cancellationTokenSource.Cancel();
 
         _server?.Stop();
-        _client?.Disconnect();
+        _client?.DisconnectAll();
 
         incomingThread.Join();
         outgoingThread.Join();
