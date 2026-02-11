@@ -182,8 +182,8 @@ public class TcpServer
         lock (this._connectedPeersLock) {
             this._connectedPeers.Remove(peer);
         }
-        if (this.OnPeerConnected is not null) {
-            this.OnPeerConnected(peer);
+        if (this.OnPeerDisconnected is not null) {
+            this.OnPeerDisconnected(peer);
         }
     }
 
