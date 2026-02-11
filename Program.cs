@@ -96,32 +96,32 @@ class Program
 
         _server.OnPeerConnected += (peer) => 
         { 
-            Console.WriteLine($"{peer} connected to server");
+            Console.WriteLine($"Client connected: {peer}");
         };
 
         _server.OnMessageReceived += (peer, msg) => 
         {
-            _client.BroadcastAsync(msg.ToString()); // TODO do we await here?
+            Console.WriteLine($"[{peer}]: {msg}");
         };
 
         _server.OnPeerDisconnected += (peer) => 
         {
-            Console.WriteLine($"{peer} disconnected from server");
+            Console.WriteLine($"Client disconnected: {peer}");
         };
 
         _client.OnConnected += (peer) =>  
         {
-            Console.WriteLine($"Client connected to {peer}");
+            Console.WriteLine($"Connected to Server: {peer}");
         };
 
         _client.OnMessageReceived += (peer, msg) => 
         {
-            _consoleUI.DisplayMessage(msg);
+            Console.WriteLine($"Server: {msg}");
         };
 
         _client.OnDisconnected += (peer) => 
         {
-            Console.WriteLine($"Client disconnected from {peer}");
+            Console.WriteLine($"Disconnect from server: {peer}");
         };
 
         // TODO: Start background threads
@@ -148,6 +148,7 @@ class Program
 
         incomingThread.Start();
         outgoingThread.Start();
+
 
         Console.WriteLine("Type /help for available commands");
         Console.WriteLine();
@@ -222,7 +223,7 @@ class Program
         _cancellationTokenSource.Cancel();
 
         _server?.Stop();
-        // TODO : disconnect all clients _client?.Disconnect();
+        _client?.Disconnect();
 
         incomingThread.Join();
         outgoingThread.Join();
