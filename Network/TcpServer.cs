@@ -118,7 +118,9 @@ public class TcpServer
         this.OnPeerConnected(peer);
         lock (_receiveThreadsLock) {
             // start a receive loop for this specific peer
-            this._receiveThreads.Add(new Thread(() => ReceiveLoop(peer)));
+            Thread receiveThread = new Thread(() => ReceiveLoop(peer));
+            this._receiveThreads.Add(receiveThread);
+            receiveThread.Start(); 
         }
     }
 
@@ -151,6 +153,7 @@ public class TcpServer
             var streamReader = new StreamReader(peer.Stream);
 
             while (peer.IsConnected && !this._cancellationTokenSource.Token.IsCancellationRequested) {
+                //Console.WriteLine("Flag");
                 var line = streamReader.ReadLine();
                 if (line is null) {
                     // connection closed

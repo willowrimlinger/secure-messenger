@@ -101,6 +101,7 @@ class Program
 
         _server.OnMessageReceived += (peer, msg) => 
         {
+            _consoleUI.DisplayMessage(msg);
             _messageQueue.EnqueueOutgoing(msg);
         };
 
