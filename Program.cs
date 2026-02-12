@@ -179,7 +179,11 @@ class Program
 
                     var parsed_input = _consoleUI.ParseCommand(input);
                     if (!parsed_input.IsCommand) {
-                        Console.WriteLine("TODO: not a command: Send as a message to peers");
+                        Message msg = new Message(); 
+                        //msg.Sender = TODO: sender info
+                        msg.Content = parsed_input.Message; 
+                        _messageQueue.EnqueueOutgoing(msg); 
+                        continue; 
                     }
 
                     switch (parsed_input.CommandType)
