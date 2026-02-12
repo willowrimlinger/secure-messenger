@@ -43,6 +43,7 @@ public class TcpServer
         this.Port = port;
         this._cancellationTokenSource = new CancellationTokenSource();
         this._listener = new TcpListener(IPAddress.Any, port);
+        this._listener.Start();
         this.IsListening = true;
         this._listenThread = new Thread(ListenLoop);
         Console.WriteLine("Server is listening..."); // TODO hook this up to ConsoleUI method?

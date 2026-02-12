@@ -101,7 +101,7 @@ class Program
 
         _server.OnMessageReceived += (peer, msg) => 
         {
-            Console.WriteLine($"[{peer}]: {msg}");
+            _messageQueue.EnqueueOutgoing(msg);
         };
 
         _server.OnPeerDisconnected += (peer) => 
@@ -116,7 +116,7 @@ class Program
 
         _client.OnMessageReceived += (peer, msg) => 
         {
-            Console.WriteLine($"Server: {msg}");
+            _messageQueue.EnqueueIncoming(msg);
         };
 
         _client.OnDisconnected += (peer) => 
@@ -132,8 +132,7 @@ class Program
         {
             while (!_cancellationTokenSource!.IsCancellationRequested)
             {
-                // TODO: incoming messages
-                Thread.Sleep(50);
+                _consoleUI.DisplayMessage(_messageQueue.DequeueIncoming());
             }
         });
 
@@ -141,8 +140,7 @@ class Program
         {
             while (!_cancellationTokenSource!.IsCancellationRequested)
             {
-                // TODO: outgoing messages
-                Thread.Sleep(50);
+                _client.BroadcastAsync(_messageQueue.DequeueOutgoing().ToString());
             }
         });
 
