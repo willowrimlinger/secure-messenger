@@ -7,7 +7,7 @@
 - Alia Ulanbek Kyzy - [Role/Responsibilities]
 - Michael Reizenstein - [Role/Responsibilities]
 - Sean Gaines - [Role/Responsibilities]
-- Willow Rimlinger - [TCPServer.cs]
+- Willow Rimlinger - TCPServer.cs
 
 **Date:** [Submission Date]
 
@@ -16,7 +16,6 @@
 ## Build Instructions
 
 ### Prerequisites
-- [List required software, e.g., .NET SDK version]
 - .NET SDK 9
 - [Any other dependencies]
 
@@ -63,7 +62,9 @@ dotnet run
 - [Additional threads...]
 
 ### Thread-Safe Message Queue
-[Describe your message queue implementation and synchronization approach]
+
+The message queue is implemented using a BlockingCollection which guaruntees
+atomic enqueues and dequeues.
 
 ---
 
