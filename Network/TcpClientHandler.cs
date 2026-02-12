@@ -39,7 +39,33 @@ public class TcpClientHandler
     /// </summary>
     public async Task<bool> ConnectAsync(string host, int port)
     {
-        throw new NotImplementedException("Implement ConnectAsync() - see TODO in comments above");
+        try
+        {
+            TcpClient client = new TcpClient();
+            await client.ConnectAsync(host, port);
+            NetworkStream stream = client.GetStream();
+            Peer peer = new Peer
+            {
+                Client = client,
+                Stream = stream,
+                Address = IPAddress.Parse(host),
+                Port = port,
+                IsConnected = true
+            };
+            lock (_lock)
+            {
+                _connections[peer.Id] = peer;
+            }
+
+            OnConnected?.Invoke(peer);
+            _ = Task.Run(() => ReceiveLoop(peer));
+            return true;
+        }
+        catch (SocketException ex)
+        {
+            System.Console.WriteLine($"Failed to connect to {host}:{port}: {ex.Message}");
+            return false;
+        }
     }
 
     /// <summary>
@@ -57,7 +83,34 @@ public class TcpClientHandler
     /// </summary>
     private async Task ReceiveLoop(Peer peer)
     {
-        throw new NotImplementedException("Implement ReceiveLoop() - see TODO in comments above");
+        try
+        {
+            using var reader = new StreamReader(peer.Stream, leaveOpen: false);
+            while (peer.IsConnected)
+            {
+                string? line = await reader.ReadLineAsync();
+                if (line == null)
+                {
+                    break;
+                }
+                Message message = new Message
+                {
+                    Id = Guid.NewGuid(),
+                    Sender = $"{peer.Address}:{peer.Port}",
+                    Content = line,
+                    Timestamp = DateTime.Now
+                };
+                OnMessageReceived?.Invoke(peer, message);
+            }
+        }
+        catch (IOException ex)
+        {
+            System.Console.WriteLine($"Error reading from peer {peer.Id}: {ex.Message}");
+        }
+        finally
+        {
+            Disconnect(peer.Id);
+        }
     }
 
     /// <summary>
@@ -72,7 +125,25 @@ public class TcpClientHandler
     /// </summary>
     public async Task SendAsync(string peerId, string message)
     {
-        throw new NotImplementedException("Implement SendAsync() - see TODO in comments above");
+        Peer? peer;
+        lock (_lock)
+        {
+            _connections.TryGetValue(peerId, out peer);
+        }
+        if (peer != null && peer.IsConnected && peer.Stream != null)
+        {
+            try
+            {
+                using var writer = new StreamWriter(peer.Stream, leaveOpen: true);
+                await writer.WriteLineAsync(message);
+                await writer.FlushAsync();
+            }
+            catch (IOException ex)
+            {
+                System.Console.WriteLine($"Error sending to peer {peerId}: {ex.Message}");
+                Disconnect(peerId);
+            }
+        }
     }
 
     /// <summary>
@@ -84,7 +155,15 @@ public class TcpClientHandler
     /// </summary>
     public async Task BroadcastAsync(string message)
     {
-        throw new NotImplementedException("Implement BroadcastAsync() - see TODO in comments above");
+        List<Peer> peers;
+        lock (_lock)
+        {
+            peers = _connections.Values.ToList();
+        }
+        foreach (var peer in peers)
+        {
+            await SendAsync(peer.Id, message);
+        }
     }
 
     /// <summary>
@@ -99,7 +178,21 @@ public class TcpClientHandler
     /// </summary>
     public void Disconnect(string peerId)
     {
-        throw new NotImplementedException("Implement Disconnect() - see TODO in comments above");
+        Peer? peer;
+        lock (_lock)
+        {
+            if (_connections.TryGetValue(peerId, out peer))
+            {
+                _connections.Remove(peerId);
+            }
+        }
+        if (peer != null)
+        {
+            peer.IsConnected = false;
+            peer.Client?.Dispose();
+            peer.Stream?.Dispose();
+            OnDisconnected?.Invoke(peer);
+        }
     }
 
     public void DisconnectAll()
