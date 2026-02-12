@@ -103,6 +103,7 @@ public class TcpServer
             throw new NullReferenceException("OnPeerConnected is null");
         }
 
+        // create a port for the server to get track of
         Peer peer = new Peer();
         peer.Client = client;
         peer.Stream = client.GetStream();
@@ -116,6 +117,7 @@ public class TcpServer
 
         this.OnPeerConnected(peer);
         lock (_receiveThreadsLock) {
+            // start a receive loop for this specific peer
             this._receiveThreads.Add(new Thread(() => ReceiveLoop(peer)));
         }
     }
@@ -145,6 +147,7 @@ public class TcpServer
         }
 
         try {
+            // try to receive a message from this specific peer
             var streamReader = new StreamReader(peer.Stream);
 
             while (peer.IsConnected && !this._cancellationTokenSource.Token.IsCancellationRequested) {
@@ -155,6 +158,8 @@ public class TcpServer
                 }
                 var message = new Message();
                 message.Content = line;
+                // if we received a message, call callback
+                // which adds it to the outgoing queue for broadcast to all other peers
                 this.OnMessageReceived(peer, message);
             }
         } catch (IOException e) {
