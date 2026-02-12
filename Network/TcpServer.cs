@@ -46,7 +46,8 @@ public class TcpServer
         this._listener.Start();
         this.IsListening = true;
         this._listenThread = new Thread(ListenLoop);
-        Console.WriteLine("Server is listening..."); // TODO hook this up to ConsoleUI method?
+        this._listenThread.Start();
+        Console.WriteLine("Server is listening...");
     }
 
     /// <summary>
@@ -73,9 +74,9 @@ public class TcpServer
                     Thread.Sleep(100);
                 }
             } catch (SocketException e) {
-                Console.WriteLine("SocketException: {0}", e); // TODO hook this up to ConsoleUI method?
+                Console.WriteLine("SocketException: {0}", e);
             } catch (IOException e) {
-                Console.WriteLine("IOException: {0}", e); // TODO hook this up to ConsoleUI method?
+                Console.WriteLine("IOException: {0}", e);
             }
         }
     }
@@ -157,7 +158,7 @@ public class TcpServer
                 this.OnMessageReceived(peer, message);
             }
         } catch (IOException e) {
-            Console.WriteLine("IOException: {0}", e); // TODO hook this up to ConsoleUI method?
+            Console.WriteLine("IOException: {0}", e);
         } finally {
             this.DisconnectPeer(peer);
         }
