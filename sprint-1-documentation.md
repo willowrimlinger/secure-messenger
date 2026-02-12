@@ -7,7 +7,7 @@
 - Alia Ulanbek Kyzy - [Role/Responsibilities]
 - Michael Reizenstein - [Role/Responsibilities]
 - Sean Gaines - [Role/Responsibilities]
-- Willow Rimlinger - [Role/Responsibilities]
+- Willow Rimlinger - [TCPServer.cs]
 
 **Date:** [Submission Date]
 
@@ -17,11 +17,12 @@
 
 ### Prerequisites
 - [List required software, e.g., .NET SDK version]
+- .NET SDK 9
 - [Any other dependencies]
 
 ### Building the Project
 ```
-[Commands to build the project]
+dotnet run
 ```
 
 ---
@@ -56,9 +57,9 @@
 ### Threading Model
 [Describe your threading approach - which threads exist and what each does]
 
-- **Main Thread:** [Purpose]
-- **Receive Thread:** [Purpose]
-- **Send Thread:** [Purpose]
+- **Main Thread:** Listen for commands, display the UI, and manage the message queue
+- **Receive Thread:** Displays messages that the client receives
+- **Send Thread:** Receives messages from peers and broadcasts it to all other peers
 - [Additional threads...]
 
 ### Thread-Safe Message Queue
@@ -68,13 +69,13 @@
 
 ## Features Implemented
 
-- [ ] Multi-threaded architecture
-- [ ] Thread-safe message queue
-- [ ] TCP server (listen for connections)
-- [ ] TCP client (connect to peers)
+- [x] Multi-threaded architecture
+- [x] Thread-safe message queue
+- [x] TCP server (listen for connections)
+- [x] TCP client (connect to peers)
 - [ ] Send/receive text messages
 - [ ] Graceful disconnection handling
-- [ ] Console UI with commands
+- [x] Console UI with commands
 
 ---
 
