@@ -17,7 +17,6 @@
 
 ### Prerequisites
 - .NET SDK 9
-- [Any other dependencies]
 
 ### Building the Project
 ```
@@ -30,7 +29,7 @@ dotnet run
 
 ### Starting the Application
 ```
-[Commands to run the application]
+dotnet run
 ```
 
 ### Command Line Arguments (if any)
@@ -47,7 +46,8 @@ dotnet run
 | `/connect <ip> <port>` | Connect to a peer | `/connect 192.168.1.100 5000` |
 | `/listen <port>` | Start listening for connections | `/listen 5000` |
 | `/quit` | Exit the application | `/quit` |
-| | | |
+| `/peers` | List connected peers | `/peers` |
+| `/history` | View message history | `/history` |
 
 ---
 
@@ -57,9 +57,10 @@ dotnet run
 [Describe your threading approach - which threads exist and what each does]
 
 - **Main Thread:** Listen for commands, display the UI, and manage the message queue
-- **Receive Thread:** Displays messages that the client receives
-- **Send Thread:** Receives messages from peers and broadcasts it to all other peers
-- [Additional threads...]
+- **Receive Thread:** Displays messages from the incoming message queue
+- **Send Thread:** Takes messages from the outgoing message queue and broadcasts them to all other peers
+- **TcpServer Listen Thread** Listen for incoming connections and once received, spawn a new receive thread to handle messages
+- **TcpServer Receive Thread** Receives messages from a single peer and adds them to the incoming messages queue. One thread per peer.
 
 ### Thread-Safe Message Queue
 
@@ -74,8 +75,8 @@ atomic enqueues and dequeues.
 - [x] Thread-safe message queue
 - [x] TCP server (listen for connections)
 - [x] TCP client (connect to peers)
-- [ ] Send/receive text messages
-- [ ] Graceful disconnection handling
+- [x] Send/receive text messages
+- [x] Graceful disconnection handling
 - [x] Console UI with commands
 
 ---
@@ -85,10 +86,10 @@ atomic enqueues and dequeues.
 ### Test Cases
 | Test | Expected Result | Actual Result | Pass/Fail |
 |------|-----------------|---------------|-----------|
-| Two instances can connect | Connection established | | |
-| Messages sent and received | Message appears on other instance | | |
-| Disconnection handled | No crash, appropriate message | | |
-| Thread safety under load | No race conditions | | |
+| Two instances can connect | Connection established | Connection established | Pass |
+| Messages sent and received | Message appears on other instance | Message appears on other instance | Pass |
+| Disconnection handled | No crash, appropriate message | No crash, appropriate message | Pass |
+| Thread safety under load | No race conditions | No race conditions | Pass |
 
 ---
 
