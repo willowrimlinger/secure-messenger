@@ -161,6 +161,7 @@ public class TcpServer
                 }
                 var message = new Message();
                 message.Content = line;
+                message.Sender = peer.Id; 
                 // if we received a message, call callback
                 // which adds it to the outgoing queue for broadcast to all other peers
                 //this.BroadcastAsync(message); 
@@ -186,6 +187,8 @@ public class TcpServer
 
         foreach (Peer receiver in peers)
         {
+            if (receiver == null || !receiver.IsConnected || receiver.Stream == null) continue; 
+            if (receiver.Id == message.Sender) continue; 
             try
             {
                 var writer = new StreamWriter(receiver.Stream, leaveOpen: true); 
