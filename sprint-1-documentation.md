@@ -4,12 +4,12 @@
 **Team Name:** Group 5
 
 **Team Members:**
-- Alia Ulanbek Kyzy - [Role/Responsibilities]
-- Michael Reizenstein - [Role/Responsibilities]
-- Sean Gaines - [Role/Responsibilities]
+- Alia Ulanbek Kyzy - Program.cs, Console.UI
+- Michael Reizenstein - TcpClientHandler.cs
+- Sean Gaines - Console.UI, TcpServer.cs
 - Willow Rimlinger - TCPServer.cs
 
-**Date:** [Submission Date]
+**Date:** 02/27/26
 
 ---
 
