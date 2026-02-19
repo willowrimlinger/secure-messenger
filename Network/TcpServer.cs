@@ -163,12 +163,39 @@ public class TcpServer
                 message.Content = line;
                 // if we received a message, call callback
                 // which adds it to the outgoing queue for broadcast to all other peers
+                //this.BroadcastAsync(message); 
                 this.OnMessageReceived(peer, message);
             }
         } catch (IOException e) {
             Console.WriteLine("IOException: {0}", e);
         } finally {
             this.DisconnectPeer(peer);
+        }
+    }
+
+    ///<summary> 
+    /// Broadcast a message to all connected peers, except for its source
+    public async Task BroadcastAsync(Message message)
+    {
+        List<Peer> peers; 
+
+        lock(_connectedPeersLock)
+        {
+            peers = new(_connectedPeers); 
+        }
+
+        foreach (Peer receiver in peers)
+        {
+            try
+            {
+                var writer = new StreamWriter(receiver.Stream, leaveOpen: true); 
+                await writer.WriteLineAsync(message.Content); 
+                writer.FlushAsync(); 
+            }
+            catch (IOException ex)
+            {
+                System.Console.WriteLine($"Error sending message to peer {receiver.Id}: {ex.Message}"); 
+            }
         }
     }
 
