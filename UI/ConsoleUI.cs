@@ -36,7 +36,6 @@ public class ConsoleUI
     public void DisplayMessage(Message message)
     {
         Console.WriteLine(message.ToString());
-        //throw new NotImplementedException("Implement DisplayMessage() - see TODO in comments above");
     }
 
     /// <summary>
@@ -48,7 +47,6 @@ public class ConsoleUI
     public void DisplaySystem(string message)
     {
         Console.WriteLine($"[System] {message}");
-        throw new NotImplementedException("Implement DisplaySystem() - see TODO in comments above");
     }
 
     /// <summary>

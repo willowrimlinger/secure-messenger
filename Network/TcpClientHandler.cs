@@ -125,7 +125,6 @@ public class TcpClientHandler
     /// </summary>
     public async Task SendAsync(string peerId, string message)
     {
-        Console.WriteLine($"Sending to {peerId}: {message}");
         Peer? peer;
         lock (_lock)
         {
@@ -156,7 +155,6 @@ public class TcpClientHandler
     /// </summary>
     public async Task BroadcastAsync(string message)
     {
-        Console.WriteLine($"Sending Message: {message}");
         List<Peer> peers;
         lock (_lock)
         {

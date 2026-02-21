@@ -141,9 +141,10 @@ class Program
         {
             while (!_cancellationTokenSource!.IsCancellationRequested)
             {
-                _client.BroadcastAsync(_messageQueue.DequeueOutgoing().ToString()); 
+                var msg = _messageQueue.DequeueOutgoing(); 
+                _client.BroadcastAsync(msg.Content); 
                 if(_server.IsListening)
-                    _server.BroadcastAsync(_messageQueue.DequeueOutgoing());
+                    _server.BroadcastAsync(msg);
             }
         });
 
