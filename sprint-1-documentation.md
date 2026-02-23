@@ -54,7 +54,6 @@ dotnet run
 ## Architecture Overview
 
 ### Threading Model
-[Describe your threading approach - which threads exist and what each does]
 
 - **Main Thread:** Listen for commands, display the UI, and manage the message queue
 - **Receive Thread:** Displays messages from the incoming message queue
