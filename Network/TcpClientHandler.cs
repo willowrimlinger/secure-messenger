@@ -41,9 +41,12 @@ public class TcpClientHandler
     {
         try
         {
+            /// Creates a new TCP client and connects to the host and port given
             TcpClient client = new TcpClient();
             await client.ConnectAsync(host, port);
+            /// Once connected, get the network stream for communication
             NetworkStream stream = client.GetStream();
+            /// Creates new peer object
             Peer peer = new Peer
             {
                 Client = client,
@@ -52,15 +55,18 @@ public class TcpClientHandler
                 Port = port,
                 IsConnected = true
             };
+            /// Locking threads to only allow one thread to access the connections dictionary at a time
             lock (_lock)
             {
                 _connections[peer.Id] = peer;
             }
-
+            /// Connection event (prevents a null connection)
             OnConnected?.Invoke(peer);
+            /// Starts the background task to receive messages from the peer
             _ = Task.Run(() => ReceiveLoop(peer));
             return true;
         }
+        /// Handles network errors
         catch (SocketException ex)
         {
             System.Console.WriteLine($"Failed to connect to {host}:{port}: {ex.Message}");
@@ -85,14 +91,18 @@ public class TcpClientHandler
     {
         try
         {
+            /// Creates a stream reader to read incoming messages from the peer
             using var reader = new StreamReader(peer.Stream, leaveOpen: false);
+            /// Loops while the peer is still connected
             while (peer.IsConnected)
             {
+                /// Reads a line of text asynchronously from the stream
                 string? line = await reader.ReadLineAsync();
                 if (line == null)
                 {
                     break;
                 }
+                /// Creates a new message object with the received content
                 Message message = new Message
                 {
                     Id = Guid.NewGuid(),
@@ -100,6 +110,7 @@ public class TcpClientHandler
                     Content = line,
                     Timestamp = DateTime.Now
                 };
+                /// Invokes the message received event
                 OnMessageReceived?.Invoke(peer, message);
             }
         }
@@ -125,17 +136,23 @@ public class TcpClientHandler
     /// </summary>
     public async Task SendAsync(string peerId, string message)
     {
+        /// Looks up the peer in the connections dictionary
         Peer? peer;
+        /// Locks threads to only allow one thread to access the connections dictionary at a time
         lock (_lock)
         {
             _connections.TryGetValue(peerId, out peer);
         }
+        /// Sends the message if the peer is connected and has a valid stream
         if (peer != null && peer.IsConnected && peer.Stream != null)
         {
             try
             {
+                /// Creates a stream writer to send the message to the peer
                 using var writer = new StreamWriter(peer.Stream, leaveOpen: true);
+                /// Writes the message line asynchronously
                 await writer.WriteLineAsync(message);
+                /// Flushes the writer to ensure the message is sent
                 await writer.FlushAsync();
             }
             catch (IOException ex)
