@@ -29,32 +29,27 @@ public class ConsoleUI
     /// <summary>
     /// Display a received message to the console.
     ///
-    /// TODO: Implement the following:
     /// 1. Format the timestamp as "HH:mm:ss"
     /// 2. Print in format: "[timestamp] sender: content"
     /// </summary>
     public void DisplayMessage(Message message)
     {
         Console.WriteLine(message.ToString());
-        //throw new NotImplementedException("Implement DisplayMessage() - see TODO in comments above");
     }
 
     /// <summary>
     /// Display a system message to the console.
     ///
-    /// TODO: Implement the following:
     /// 1. Print in format: "[System] message"
     /// </summary>
     public void DisplaySystem(string message)
     {
         Console.WriteLine($"[System] {message}");
-        throw new NotImplementedException("Implement DisplaySystem() - see TODO in comments above");
     }
 
     /// <summary>
     /// Show available commands to the user.
     ///
-    /// TODO: Implement the following:
     /// 1. Print a formatted help message showing all available commands
     /// 2. Include: /connect, /listen, /peers, /history, /quit
     /// </summary>
@@ -72,7 +67,6 @@ public class ConsoleUI
     /// <summary>
     /// Parse user input and return a CommandResult.
     ///
-    /// TODO: Implement the following:
     /// 1. Check if input starts with "/" - if not, it's a regular message:
     ///    - Return CommandResult with IsCommand = false, Message = input
     ///

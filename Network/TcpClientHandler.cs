@@ -1,4 +1,4 @@
-// [Your Name Here]
+// [Michael Reizenstein]
 // CSCI 251 - Secure Distributed Messenger
 
 using System.Net;
@@ -22,7 +22,6 @@ public class TcpClientHandler
     /// <summary>
     /// Connect to a peer at the specified address and port.
     ///
-    /// TODO: Implement the following:
     /// 1. Create a new TcpClient
     /// 2. Connect asynchronously to the host and port
     /// 3. Create a Peer object with:
@@ -77,7 +76,6 @@ public class TcpClientHandler
     /// <summary>
     /// Receive loop for a connected peer - reads messages until disconnection.
     ///
-    /// TODO: Implement the following:
     /// 1. Create a StreamReader from the peer's stream
     /// 2. Loop while peer is connected
     /// 3. Read a line asynchronously (ReadLineAsync)
@@ -127,7 +125,6 @@ public class TcpClientHandler
     /// <summary>
     /// Send a message to a specific peer.
     ///
-    /// TODO: Implement the following:
     /// 1. Look up the peer in _connections by peerId (with proper locking)
     /// 2. If peer exists and is connected with a valid stream:
     ///    - Create a StreamWriter (with leaveOpen: true)
@@ -166,7 +163,6 @@ public class TcpClientHandler
     /// <summary>
     /// Broadcast a message to all connected peers.
     ///
-    /// TODO: Implement the following:
     /// 1. Get a copy of all peers (with proper locking)
     /// 2. Loop through each peer and call SendAsync
     /// </summary>
@@ -186,7 +182,6 @@ public class TcpClientHandler
     /// <summary>
     /// Disconnect from a peer.
     ///
-    /// TODO: Implement the following:
     /// 1. Remove the peer from _connections (with proper locking)
     /// 2. If peer was found:
     ///    - Set IsConnected to false
@@ -211,7 +206,13 @@ public class TcpClientHandler
             OnDisconnected?.Invoke(peer);
         }
     }
-
+    /// <summary>
+    /// Disconnect from all peers.
+    ///
+    /// 1. loops through all peers; at each peer
+    ///     - disconnect(peer) is called
+    ///
+    /// </summary>
     public void DisconnectAll()
     {
         lock (_lock)

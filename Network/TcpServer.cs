@@ -103,6 +103,7 @@ public class TcpServer
             throw new NullReferenceException("OnPeerConnected is null");
         }
 
+        // create a port for the server to get track of
         Peer peer = new Peer();
         peer.Client = client;
         peer.Stream = client.GetStream();
@@ -116,7 +117,10 @@ public class TcpServer
 
         this.OnPeerConnected(peer);
         lock (_receiveThreadsLock) {
-            this._receiveThreads.Add(new Thread(() => ReceiveLoop(peer)));
+            // start a receive loop for this specific peer
+            Thread receiveThread = new Thread(() => ReceiveLoop(peer));
+            this._receiveThreads.Add(receiveThread);
+            receiveThread.Start(); 
         }
     }
 
@@ -145,9 +149,11 @@ public class TcpServer
         }
 
         try {
+            // try to receive a message from this specific peer
             var streamReader = new StreamReader(peer.Stream);
 
             while (peer.IsConnected && !this._cancellationTokenSource.Token.IsCancellationRequested) {
+                //Console.WriteLine("Flag");
                 var line = streamReader.ReadLine();
                 if (line is null) {
                     // connection closed
@@ -155,12 +161,44 @@ public class TcpServer
                 }
                 var message = new Message();
                 message.Content = line;
+                message.Sender = peer.Id; 
+                // if we received a message, call callback
+                // which adds it to the outgoing queue for broadcast to all other peers
+                //this.BroadcastAsync(message); 
                 this.OnMessageReceived(peer, message);
             }
         } catch (IOException e) {
             Console.WriteLine("IOException: {0}", e);
         } finally {
             this.DisconnectPeer(peer);
+        }
+    }
+
+    ///<summary> 
+    /// Broadcast a message to all connected peers, except for its source
+    public async Task BroadcastAsync(Message message)
+    {
+        List<Peer> peers; 
+
+        lock(_connectedPeersLock)
+        {
+            peers = new(_connectedPeers); 
+        }
+
+        foreach (Peer receiver in peers)
+        {
+            if (receiver == null || !receiver.IsConnected || receiver.Stream == null) continue; 
+            if (receiver.Id == message.Sender) continue; 
+            try
+            {
+                var writer = new StreamWriter(receiver.Stream, leaveOpen: true); 
+                await writer.WriteLineAsync(message.Content); 
+                writer.FlushAsync(); 
+            }
+            catch (IOException ex)
+            {
+                System.Console.WriteLine($"Error sending message to peer {receiver.Id}: {ex.Message}"); 
+            }
         }
     }
 

@@ -101,6 +101,7 @@ class Program
 
         _server.OnMessageReceived += (peer, msg) => 
         {
+            _consoleUI.DisplayMessage(msg);
             _messageQueue.EnqueueOutgoing(msg);
         };
 
@@ -140,7 +141,10 @@ class Program
         {
             while (!_cancellationTokenSource!.IsCancellationRequested)
             {
-                _client.BroadcastAsync(_messageQueue.DequeueOutgoing().ToString());
+                var msg = _messageQueue.DequeueOutgoing(); 
+                _client.BroadcastAsync(msg.Content); 
+                if(_server.IsListening)
+                    _server.BroadcastAsync(msg);
             }
         });
 
