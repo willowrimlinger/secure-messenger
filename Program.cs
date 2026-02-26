@@ -11,6 +11,7 @@ using SecureMessenger.Core;
 using SecureMessenger.Network;
 using SecureMessenger.Security;
 using SecureMessenger.UI;
+using System.Text.Json; 
 
 namespace SecureMessenger;
 
@@ -85,7 +86,7 @@ class Program
 
         _server.OnPeerConnected += (peer) => 
         { 
-            Console.WriteLine($"Client connected: {peer}");
+            _consoleUI.DisplaySystem($"Client connected: {peer}");
         };
 
         _server.OnMessageReceived += (peer, msg) => 
@@ -96,12 +97,12 @@ class Program
 
         _server.OnPeerDisconnected += (peer) => 
         {
-            Console.WriteLine($"Client disconnected: {peer}");
+            _consoleUI.DisplaySystem($"Client disconnected: {peer}");
         };
 
         _client.OnConnected += (peer) =>  
         {
-            Console.WriteLine($"Connected to Server: {peer}");
+            _consoleUI.DisplaySystem($"Connected to Server: {peer}");
         };
 
         _client.OnMessageReceived += (peer, msg) => 
@@ -111,7 +112,7 @@ class Program
 
         _client.OnDisconnected += (peer) => 
         {
-            Console.WriteLine($"Disconnect from server: {peer}");
+            _consoleUI.DisplaySystem($"Disconnect from server: {peer}");
         };
 
         // 1. Start a thread/task for processing incoming messages
@@ -129,8 +130,8 @@ class Program
         {
             while (!_cancellationTokenSource!.IsCancellationRequested)
             {
-                var msg = _messageQueue.DequeueOutgoing(); 
-                _client.BroadcastAsync(msg.Content); 
+                Message msg = _messageQueue.DequeueOutgoing(); 
+                _client.BroadcastAsync(msg); 
                 if(_server.IsListening)
                     _server.BroadcastAsync(msg);
             }

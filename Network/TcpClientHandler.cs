@@ -4,6 +4,9 @@
 using System.Net;
 using System.Net.Sockets;
 using SecureMessenger.Core;
+using System.Text.Json; 
+using System;
+using System.Text;
 
 namespace SecureMessenger.Network;
 
@@ -89,32 +92,64 @@ public class TcpClientHandler
     {
         try
         {
-            /// Creates a stream reader to read incoming messages from the peer
-            using var reader = new StreamReader(peer.Stream, leaveOpen: false);
+            var reader = peer.Stream;
             /// Loops while the peer is still connected
+            
+            byte[] messageLengthBuffer = new byte[4];
+            byte[] byteMessage; 
+
             while (peer.IsConnected)
             {
+                int totalBytes = 0; 
                 /// Reads a line of text asynchronously from the stream
-                string? line = await reader.ReadLineAsync();
+                while(totalBytes < 4)
+                {
+                    int bytesRead = await reader.ReadAsync(messageLengthBuffer, totalBytes, 4 - totalBytes);
+                    if(bytesRead == 0)
+                    {
+                        peer.IsConnected = false; 
+                        break; 
+                    }
+                    totalBytes += bytesRead; 
+                }
+
+                if(!peer.IsConnected)
+                    break; 
+
+                totalBytes = 0; 
+                int length = BitConverter.ToInt32(messageLengthBuffer, 0); 
+
+                byteMessage = new byte[length]; 
+                
+                while(totalBytes < length)
+                {
+                    int bytesRead = await reader.ReadAsync(byteMessage, totalBytes, length - totalBytes); 
+                    if(bytesRead == 0)
+                    {
+                        peer.IsConnected = false; 
+                        break; 
+                    }
+                    totalBytes += bytesRead; 
+                }
+
+                if(!peer.IsConnected)
+                    break; 
+
+                string line = Encoding.UTF8.GetString(byteMessage, 0, length);
+
                 if (line == null)
                 {
                     break;
                 }
                 /// Creates a new message object with the received content
-                Message message = new Message
-                {
-                    Id = Guid.NewGuid(),
-                    Sender = $"{peer.Address}:{peer.Port}",
-                    Content = line,
-                    Timestamp = DateTime.Now
-                };
+                Message message = JsonSerializer.Deserialize<Message>(line);
                 /// Invokes the message received event
                 OnMessageReceived?.Invoke(peer, message);
             }
         }
         catch (IOException ex)
         {
-            System.Console.WriteLine($"Error reading from peer {peer.Id}: {ex.Message}");
+            System.Console.WriteLine($"Error reading from peer {peer}: {ex.Message}");
         }
         finally
         {
@@ -131,7 +166,7 @@ public class TcpClientHandler
     ///    - Write the message line asynchronously
     ///    - Flush the writer
     /// </summary>
-    public async Task SendAsync(string peerId, string message)
+    public async Task SendAsync(string peerId, Message message)
     {
         /// Looks up the peer in the connections dictionary
         Peer? peer;
@@ -145,10 +180,11 @@ public class TcpClientHandler
         {
             try
             {
+                byte[] byteMessage = message.ToByteArray(); 
                 /// Creates a stream writer to send the message to the peer
-                using var writer = new StreamWriter(peer.Stream, leaveOpen: true);
+                var writer = peer.Stream;
                 /// Writes the message line asynchronously
-                await writer.WriteLineAsync(message);
+                await writer.WriteAsync(byteMessage, 0, byteMessage.Length);
                 /// Flushes the writer to ensure the message is sent
                 await writer.FlushAsync();
             }
@@ -166,7 +202,7 @@ public class TcpClientHandler
     /// 1. Get a copy of all peers (with proper locking)
     /// 2. Loop through each peer and call SendAsync
     /// </summary>
-    public async Task BroadcastAsync(string message)
+    public async Task BroadcastAsync(Message message)
     {
         List<Peer> peers;
         lock (_lock)

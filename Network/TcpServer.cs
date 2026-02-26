@@ -4,6 +4,8 @@
 using System.Net;
 using System.Net.Sockets;
 using SecureMessenger.Core;
+using System.Text.Json; 
+using System.Text;
 
 namespace SecureMessenger.Network;
 
@@ -138,38 +140,83 @@ public class TcpServer
     /// </summary>
     private void ReceiveLoop(Peer peer)
     {
-        if (peer.Stream is null) {
+        if (peer.Stream is null)
             throw new NullReferenceException("Peer does not have a stream to receive from");
-        }
-        if (this._cancellationTokenSource is null) {
+
+        if (this._cancellationTokenSource is null) 
             throw new NullReferenceException("_cancellationTokenSource is null");
-        }
-        if (this.OnMessageReceived is null) {
+
+        if (this.OnMessageReceived is null) 
             throw new NullReferenceException("OnMessageReceived is null");
-        }
 
-        try {
+        try 
+        {
             // try to receive a message from this specific peer
-            var streamReader = new StreamReader(peer.Stream);
+            var reader = peer.Stream; 
 
-            while (peer.IsConnected && !this._cancellationTokenSource.Token.IsCancellationRequested) {
+            byte[] messageLengthBuffer = new byte[4];
+            byte[] byteMessage; 
+
+            while (peer.IsConnected && !this._cancellationTokenSource.Token.IsCancellationRequested) 
+            {
                 //Console.WriteLine("Flag");
-                var line = streamReader.ReadLine();
-                if (line is null) {
-                    // connection closed
+                int totalBytes = 0; 
+                /// Reads a line of text asynchronously from the stream
+                while(totalBytes < 4)
+                {
+                    var bytesRead = reader.Read(messageLengthBuffer, totalBytes, 4 - totalBytes);
+                    if(bytesRead == 0)
+                    {
+                        peer.IsConnected = false; 
+                        break; 
+                    }
+                    totalBytes += bytesRead; 
+                }
+
+                if(!peer.IsConnected)
+                    break; 
+
+                totalBytes = 0; 
+                int length = BitConverter.ToInt32(messageLengthBuffer, 0); 
+
+                byteMessage = new byte[length]; 
+                
+                while(totalBytes < length)
+                {
+                    int bytesRead = reader.Read(byteMessage, totalBytes, length - totalBytes); 
+                    if(bytesRead == 0)
+                    {
+                        peer.IsConnected = false; 
+                        break; 
+                    }
+                    totalBytes += bytesRead; 
+                }
+
+                if(!peer.IsConnected)
+                    break; 
+
+                string line = Encoding.UTF8.GetString(byteMessage, 0, length);
+
+                if (line == null)
+                {
                     break;
                 }
-                var message = new Message();
-                message.Content = line;
-                message.Sender = peer.Id; 
+                /// Creates a new message object with the received content
+                Message message = JsonSerializer.Deserialize<Message>(line);
+                if(message.Sender == "")
+                    message.Sender = $"{peer.Address}:{peer.Port}"; 
                 // if we received a message, call callback
                 // which adds it to the outgoing queue for broadcast to all other peers
                 //this.BroadcastAsync(message); 
                 this.OnMessageReceived(peer, message);
             }
-        } catch (IOException e) {
+        } 
+        catch (IOException e) 
+        {
             Console.WriteLine("IOException: {0}", e);
-        } finally {
+        } 
+        finally 
+        {
             this.DisconnectPeer(peer);
         }
     }
@@ -188,11 +235,12 @@ public class TcpServer
         foreach (Peer receiver in peers)
         {
             if (receiver == null || !receiver.IsConnected || receiver.Stream == null) continue; 
-            if (receiver.Id == message.Sender) continue; 
+            if ($"{receiver.Address}:{receiver.Port}" == message.Sender) continue; 
             try
             {
-                var writer = new StreamWriter(receiver.Stream, leaveOpen: true); 
-                await writer.WriteLineAsync(message.Content); 
+                var writer = receiver.Stream; 
+                byte[] byteMessage = message.ToByteArray(); 
+                await writer.WriteAsync(byteMessage, 0, byteMessage.Length); 
                 writer.FlushAsync(); 
             }
             catch (IOException ex)
