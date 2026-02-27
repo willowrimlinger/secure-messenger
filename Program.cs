@@ -11,6 +11,7 @@ using SecureMessenger.Core;
 using SecureMessenger.Network;
 using SecureMessenger.Security;
 using SecureMessenger.UI;
+using System.Text.Json; 
 
 namespace SecureMessenger;
 
@@ -55,15 +56,6 @@ namespace SecureMessenger;
 /// </summary>
 class Program
 {
-
-    // [X] TODO: Declare your components as fields if needed for access across methods
-    // Examples:
-    // [X] private static MessageQueue? _messageQueue;
-    // [X] private static TcpServer? _server;
-    // [X] private static TcpClientHandler? _client;
-    // [X] private static ConsoleUI? _consoleUI;
-    // [X] private static CancellationTokenSource? _cancellationTokenSource;
-
     private static MessageQueue? _messageQueue;
     private static TcpServer? _server;
     private static TcpClientHandler? _client;
@@ -75,12 +67,11 @@ class Program
         Console.WriteLine("Secure Distributed Messenger");
         Console.WriteLine("============================");
 
-        // [X] TODO: Initialize components
-        // [X] 1. Create CancellationTokenSource for shutdown signaling
-        // [X] 2. Create MessageQueue for thread communication
-        // [X] 3. Create ConsoleUI for user interface
-        // [X] 4. Create TcpServer for incoming connections
-        // [X] 5. Create TcpClientHandler for outgoing connections
+        // 1. Create CancellationTokenSource for shutdown signaling
+        // 2. Create MessageQueue for thread communication
+        // 3. Create ConsoleUI for user interface
+        // 4. Create TcpServer for incoming connections
+        // 5. Create TcpClientHandler for outgoing connections
 
         _messageQueue = new MessageQueue();
         _consoleUI = new ConsoleUI(_messageQueue);
@@ -88,15 +79,14 @@ class Program
         _client = new TcpClientHandler();
         _cancellationTokenSource = new CancellationTokenSource();
 
-        // TODO: Subscribe to events
-        // [X] 1. TcpServer.OnPeerConnected - handle new incoming connections
+        // 1. TcpServer.OnPeerConnected - handle new incoming connections
         // 2. TcpServer.OnMessageReceived - handle received messages
         // 3. TcpServer.OnPeerDisconnected - handle disconnections
         // 4. TcpClientHandler events (same pattern)
 
         _server.OnPeerConnected += (peer) => 
         { 
-            Console.WriteLine($"Client connected: {peer}");
+            _consoleUI.DisplaySystem($"Client connected: {peer}");
         };
 
         _server.OnMessageReceived += (peer, msg) => 
@@ -107,12 +97,12 @@ class Program
 
         _server.OnPeerDisconnected += (peer) => 
         {
-            Console.WriteLine($"Client disconnected: {peer}");
+            _consoleUI.DisplaySystem($"Client disconnected: {peer}");
         };
 
         _client.OnConnected += (peer) =>  
         {
-            Console.WriteLine($"Connected to Server: {peer}");
+            _consoleUI.DisplaySystem($"Connected to Server: {peer}");
         };
 
         _client.OnMessageReceived += (peer, msg) => 
@@ -122,10 +112,9 @@ class Program
 
         _client.OnDisconnected += (peer) => 
         {
-            Console.WriteLine($"Disconnect from server: {peer}");
+            _consoleUI.DisplaySystem($"Disconnect from server: {peer}");
         };
 
-        // TODO: Start background threads
         // 1. Start a thread/task for processing incoming messages
         // 2. Start a thread/task for sending outgoing messages
         // Note: TcpServer.Start() will create its own listen thread
@@ -141,8 +130,8 @@ class Program
         {
             while (!_cancellationTokenSource!.IsCancellationRequested)
             {
-                var msg = _messageQueue.DequeueOutgoing(); 
-                _client.BroadcastAsync(msg.Content); 
+                Message msg = _messageQueue.DequeueOutgoing(); 
+                _client.BroadcastAsync(msg); 
                 if(_server.IsListening)
                     _server.BroadcastAsync(msg);
             }
@@ -159,10 +148,9 @@ class Program
         bool running = true;
         while (running)
         {
-            // TODO: Implement the main input loop
-            // [X] 1. Read a line from the console
-            // [X] 2. Skip empty input
-            // [X] 3. Parse the input using ConsoleUI.ParseCommand()
+            // 1. Read a line from the console
+            // 2. Skip empty input
+            // 3. Parse the input using ConsoleUI.ParseCommand()
             // 4. Handle the command based on CommandType:
             //    - Connect: Call TcpClientHandler.ConnectAsync()
             //    - Listen: Call TcpServer.Start()
@@ -219,7 +207,6 @@ class Program
             }
         }
 
-        // TODO: Implement graceful shutdown
         // 1. Cancel the CancellationTokenSource
         // 2. Stop the TcpServer
         // 3. Disconnect all clients
@@ -236,11 +223,4 @@ class Program
 
         Console.WriteLine("Goodbye!");
     }
-
-    // TODO: Add helper methods as needed
-    // Examples:
-    // - ProcessIncomingMessages() - background task to process received messages
-    // - SendOutgoingMessages() - background task to send queued messages
-    // - HandlePeerConnected(Peer peer) - event handler for new connections
-    // - HandleMessageReceived(Peer peer, Message message) - event handler for messages
 }
