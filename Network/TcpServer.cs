@@ -1,4 +1,5 @@
 // Willow Rimlinger
+// Sean Gaines
 // CSCI 251 - Secure Distributed Messenger
 
 using System.Net;
@@ -42,14 +43,27 @@ public class TcpServer
     /// </summary>
     public void Start(int port)
     {
-        this.Port = port;
-        this._cancellationTokenSource = new CancellationTokenSource();
-        this._listener = new TcpListener(IPAddress.Any, port);
-        this._listener.Start();
-        this.IsListening = true;
-        this._listenThread = new Thread(ListenLoop);
-        this._listenThread.Start();
-        Console.WriteLine("Server is listening...");
+        try 
+        {
+            this.Port = port;
+            this._cancellationTokenSource = new CancellationTokenSource();
+            this._listener = new TcpListener(IPAddress.Any, port);
+            this._listener.Start();
+            this.IsListening = true;
+            this._listenThread = new Thread(ListenLoop);
+            this._listenThread.Start();
+            Console.WriteLine("Server is listening...");
+        }
+        catch (SocketException e)
+        {
+            Console.WriteLine($"SocketException attempting to listen on port {port}: {e}"); 
+            this.Stop(); 
+        }
+        catch (IOException e)
+        {
+            Console.WriteLine($"IOException attempting to listen on port {port}: {e}"); 
+            this.Stop(); 
+        }
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-// [Your Name Here]
+// Sean Gaines
 // CSCI 251 - Secure Distributed Messenger
 
 namespace SecureMessenger.Core;

@@ -95,38 +95,60 @@ public class ConsoleUI
         switch (command)
         {
             case "/connect":
+            {
+                var args = parts[1..].ToArray(); 
+                if(args.Length < 2)
+                {
+                    Console.WriteLine("Too few arguments for /connect. Usage: /connect [ip] [port]"); 
+                    break; 
+                }
                 return new CommandResult 
                 {
                     IsCommand = true,
                     CommandType = CommandType.Connect,
-                    Args = parts[1..].ToArray()
+                    Args = args
                 };
+            }
             case "/listen":
+            {
+                var args = parts[1..].ToArray(); 
+                if(args.Length < 1)
+                {
+                    Console.WriteLine("Too few arguments for /listen. Usage: /listen [port]"); 
+                    break; 
+                }
                 return new CommandResult 
                 {
                     IsCommand = true,
                     CommandType = CommandType.Listen,
-                    Args = parts[1..].ToArray()
+                    Args = args
                 };
+            }
             case "/peers":
+            {
                 return new CommandResult
                 {
                     IsCommand = true, 
                     CommandType = CommandType.ListPeers
                 };
+            }
             case "/history":
+            {
                 return new CommandResult
                 {
                     IsCommand = true, 
                     CommandType = CommandType.History
                 };
+            }
             case "/quit":
             case "/exit":
+            {
                 return new CommandResult
                 {
                     IsCommand = true, 
                     CommandType = CommandType.Quit
                 };
+            }
             default:
                 return new CommandResult
                 {
@@ -134,6 +156,12 @@ public class ConsoleUI
                     CommandType = CommandType.Unknown,
                     Message = $"Unknown command: {command}"
                 };
+        };
+        return new CommandResult
+        {
+            IsCommand = true, 
+            CommandType = CommandType.Unknown,
+            Message = $"Error in command: {command}"
         };
     }
 }
