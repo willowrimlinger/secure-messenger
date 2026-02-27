@@ -181,11 +181,20 @@ class Program
                     switch (parsed_input.CommandType)
                     {
                         case CommandType.Connect:
+                            
                             await _client!.ConnectAsync(parsed_input.Args[0], int.Parse(parsed_input.Args[1]));
+
                             break;
                         case CommandType.Listen:
                             if (!_server.IsListening) {
-                                _server.Start(int.Parse(parsed_input.Args[0]));
+                                try
+                                {
+                                    _server.Start(int.Parse(parsed_input.Args[0]));
+                                }
+                                catch(Exception e)
+                                {
+                                    _consoleUI.DisplaySystem($"Invalid format {parsed_input.Args[0]}. Port should be a single integer 0-65535"); 
+                                }
                             } else {
                                 _consoleUI.DisplaySystem("Server is already listening");
                             }

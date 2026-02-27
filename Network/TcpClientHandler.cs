@@ -75,6 +75,11 @@ public class TcpClientHandler
             System.Console.WriteLine($"Failed to connect to {host}:{port}: {ex.Message}");
             return false;
         }
+        catch (IndexOutOfRangeException ex)
+        {
+            System.Console.WriteLine($"{ex}");
+            return false;  
+        }
     }
 
     /// <summary>
