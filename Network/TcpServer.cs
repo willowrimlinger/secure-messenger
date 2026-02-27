@@ -1,4 +1,5 @@
 // Willow Rimlinger
+// Sean Gaines
 // CSCI 251 - Secure Distributed Messenger
 
 using System.Net;
