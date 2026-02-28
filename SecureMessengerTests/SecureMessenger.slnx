@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/secure-messenger/">
+    <Project Path="secure-messenger/SecureMessenger.csproj" />
+  </Folder>
+  <Project Path="SecureMessenger.Tests/SecureMessenger.Tests.csproj" />
+</Solution>
