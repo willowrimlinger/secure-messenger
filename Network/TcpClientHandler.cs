@@ -155,7 +155,13 @@ public class TcpClientHandler
         }
         catch (IOException ex)
         {
-            System.Console.WriteLine($"Error reading from peer {peer}: {ex.Message}");
+            if (peer.IsConnected)
+            {
+                Console.WriteLine($"Error reading from peer {peer}: {ex.Message}");
+            }
+        }
+        catch (OperationCanceledException)
+        {
         }
         finally
         {
