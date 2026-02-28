@@ -120,20 +120,37 @@ class Program
         // Note: TcpServer.Start() will create its own listen thread
         var incomingThread = new Thread(() =>
         {
-            while (!_cancellationTokenSource!.IsCancellationRequested)
+            try 
             {
-                _consoleUI.DisplayMessage(_messageQueue.DequeueIncoming());
+                while (!_cancellationTokenSource!.IsCancellationRequested)
+                {
+                    _consoleUI.DisplayMessage(_messageQueue.DequeueIncoming(_cancellationTokenSource.Token));
+                }
+            } catch (OperationCanceledException)
+            {
+            } 
+            catch (InvalidOperationException) 
+            {
             }
         });
 
         var outgoingThread = new Thread(() =>
         {
-            while (!_cancellationTokenSource!.IsCancellationRequested)
+            try 
             {
-                Message msg = _messageQueue.DequeueOutgoing(); 
-                _client.BroadcastAsync(msg); 
-                if(_server.IsListening)
-                    _server.BroadcastAsync(msg);
+                while (!_cancellationTokenSource!.IsCancellationRequested)
+                {
+                    Message msg = _messageQueue.DequeueOutgoing(); 
+                    _client.BroadcastAsync(msg); 
+                    if(_server.IsListening)
+                        _server.BroadcastAsync(msg);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
             }
         });
 
@@ -223,6 +240,8 @@ class Program
         // 5. Wait for background threads to finish
 
         _cancellationTokenSource.Cancel();
+
+        _messageQueue.CompleteAdding();
 
         _server?.Stop();
         _client?.DisconnectAll();

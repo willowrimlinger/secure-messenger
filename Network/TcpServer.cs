@@ -135,6 +135,7 @@ public class TcpServer
         lock (_receiveThreadsLock) {
             // start a receive loop for this specific peer
             Thread receiveThread = new Thread(() => ReceiveLoop(peer));
+            // receiveThread.IsBackground = true;
             this._receiveThreads.Add(receiveThread);
             receiveThread.Start(); 
         }
@@ -321,7 +322,7 @@ public class TcpServer
     /// </summary>
     public IEnumerable<Peer> GetConnectedPeers()
     {
-        lock (_connectedPeers)
+        lock (_connectedPeersLock)
         {
             return _connectedPeers.ToList();
         }
