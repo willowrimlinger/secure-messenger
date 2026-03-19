@@ -1,6 +1,7 @@
-// [Your Name Here]
+// [Michael Reizenstein]
 // CSCI 251 - Secure Distributed Messenger
 
+using System.Reflection.Metadata.Ecma335;
 using System.Security.Cryptography;
 
 namespace SecureMessenger.Security;
@@ -43,7 +44,17 @@ public class MessageSigner
     /// </summary>
     public byte[] SignData(byte[] data)
     {
-        throw new NotImplementedException("Implement SignData() - see TODO in comments above");
+        try
+        {
+            // Sign the data and return the signature
+            byte[] signature = _rsa.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            return signature;
+        }
+        catch (CryptographicException ex)
+        {
+            Console.WriteLine($"ERROR: Failed to sign data - {ex.Message}");
+            throw; // Rethrow exception to indicate signing failure
+        }
     }
 
     /// <summary>
@@ -68,6 +79,25 @@ public class MessageSigner
     /// </summary>
     public bool VerifyData(byte[] data, byte[] signature, byte[] publicKey)
     {
-        throw new NotImplementedException("Implement VerifyData() - see TODO in comments above");
+        try
+        {
+            using (RSA senderRsa = RSA.Create())
+            {
+                // Import the sender's public key and verify the signature
+                senderRsa.ImportRSAPublicKey(publicKey, out _);
+                // Verify the signature and return the result
+                bool isValid = senderRsa.VerifyData(data, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                if (!isValid)
+                {
+                    Console.WriteLine("WARNING: Invalid signature detected - message may be tampered!");
+                }
+                return isValid;
+            }
+        }
+        catch (CryptographicException ex)
+        {
+            Console.WriteLine($"ERROR: Failed to verify signature - rejecting message - {ex.Message}");
+            return false; // Reject message on verification failure
+        }
     }
 }

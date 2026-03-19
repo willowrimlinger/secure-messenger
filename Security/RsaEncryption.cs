@@ -1,4 +1,4 @@
-// [Your Name Here]
+// [Michael Reizenstein]
 // CSCI 251 - Secure Distributed Messenger
 
 using System.Security.Cryptography;
@@ -24,6 +24,8 @@ namespace SecureMessenger.Security;
 public class RsaEncryption
 {
     private readonly RSA _rsa;
+    // added peer RSA instance for encryption/decryption of session keys
+    private RSA? _peerRsa;
 
     /// <summary>
     /// Create a new RSA key pair.
@@ -34,7 +36,7 @@ public class RsaEncryption
     public RsaEncryption()
     {
         // TODO: Generate RSA key pair (2048 bits)
-        throw new NotImplementedException("Implement constructor - create RSA key pair");
+        _rsa = RSA.Create(2048);
     }
 
     /// <summary>
@@ -46,7 +48,17 @@ public class RsaEncryption
     /// </summary>
     public byte[] ExportPublicKey()
     {
-        throw new NotImplementedException("Implement ExportPublicKey() - see TODO in comments above");
+        try
+        {
+            // Export the public key and return it
+            byte[] publicKey = _rsa.ExportRSAPublicKey();
+            return publicKey;
+        }
+        catch (CryptographicException ex)
+        {
+            Console.WriteLine($"ERROR: Failed to export public key - {ex.Message}");
+            throw; // Rethrow exception to indicate export failure
+        }
     }
 
     /// <summary>
@@ -59,7 +71,17 @@ public class RsaEncryption
     /// </summary>
     public void ImportPublicKey(byte[] publicKey)
     {
-        throw new NotImplementedException("Implement ImportPublicKey() - see TODO in comments above");
+        try
+        {
+            _peerRsa?.Dispose(); // Dispose previous peer RSA if exists
+            _peerRsa = RSA.Create(); // Create new RSA instance for the peer's key
+            _peerRsa.ImportRSAPublicKey(publicKey, out _); // Import the peer's public key
+        }
+        catch (CryptographicException ex)
+        {
+            Console.WriteLine($"ERROR: Failed to import public key - {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -75,7 +97,20 @@ public class RsaEncryption
     /// </summary>
     public byte[] EncryptSessionKey(byte[] aesKey, byte[] peerPublicKey)
     {
-        throw new NotImplementedException("Implement EncryptSessionKey() - see TODO in comments above");
+        try
+        {
+            using (RSA peerRsa = RSA.Create())
+            {
+                // Import the peer's public key and encrypt the AES key
+                peerRsa.ImportRSAPublicKey(peerPublicKey, out _);
+                return peerRsa.Encrypt(aesKey, RSAEncryptionPadding.OaepSHA256);
+            }
+        }
+        catch (CryptographicException ex)
+        {
+            Console.WriteLine($"ERROR: Failed to encrypt session key - {ex.Message}");
+            throw; // Rethrow exception to indicate encryption failure
+        }
     }
 
     /// <summary>
@@ -89,7 +124,17 @@ public class RsaEncryption
     /// </summary>
     public byte[] DecryptSessionKey(byte[] encryptedKey)
     {
-        throw new NotImplementedException("Implement DecryptSessionKey() - see TODO in comments above");
+        try
+        {
+            // Decrypt the session key with our private key
+            byte[] aesKey = _rsa.Decrypt(encryptedKey, RSAEncryptionPadding.OaepSHA256);
+            return aesKey;
+        }
+        catch (CryptographicException ex)
+        {
+            Console.WriteLine($"ERROR: Failed to decrypt session key - {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -97,6 +142,7 @@ public class RsaEncryption
     /// </summary>
     public void Dispose()
     {
+        _peerRsa?.Dispose();
         _rsa?.Dispose();
     }
 }
