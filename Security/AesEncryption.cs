@@ -82,7 +82,7 @@ public class AesEncryption
         byte[] ciphertext = encryptor.TransformFinalBlock(textbytes, 0, textbytes.Length); 
         byte[] message = new byte[aes.IV.Length + ciphertext.Length];
         Buffer.BlockCopy(aes.IV, 0, message, 0, aes.IV.Length); 
-        Buffer.BlockCopy(ciphertext, 0, message, aes.IV.Length, message.Length); 
+        Buffer.BlockCopy(ciphertext, 0, message, aes.IV.Length, ciphertext.Length); 
         return message; 
     }
 
@@ -114,7 +114,8 @@ public class AesEncryption
         byte[] text = new byte[ciphertext.Length - 16]; 
         Buffer.BlockCopy(ciphertext, 16, text, 0, ciphertext.Length - 16); 
         using ICryptoTransform decryptor = aes.CreateDecryptor(); 
-        byte[] plaintext_bytes = decryptor.TransformFinalBlock(ciphertext, 0, ciphertext.Length); 
+        byte[] plaintext_bytes = decryptor.TransformFinalBlock(ciphertext, 0, ciphertext.Length)[16..]; 
+
         string plaintext = Encoding.UTF8.GetString(plaintext_bytes);
         return plaintext; 
     }

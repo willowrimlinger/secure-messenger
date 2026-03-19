@@ -3,6 +3,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 using SecureMessenger.Core;
+using SecureMessenger.Security;
+using System.Runtime.Intrinsics.Arm;
 
 namespace SecureMessenger.Tests;
 
@@ -247,5 +249,19 @@ public class LoadTests
 
             server.Stop();
         }
+    }
+}
+
+public class AesTest
+{
+    [Fact]
+    public async Task EncryptAndDecryptText()
+    {
+        byte[] key = AesEncryption.GenerateKey(); 
+        AesEncryption aesEncryption = new AesEncryption(key); 
+        string message = "What can the harvest hope for, if not the care of the Reaper Man?";
+        byte[] ciphertext = aesEncryption.Encrypt(message); 
+        string plaintext = aesEncryption.Decrypt(ciphertext); 
+        Assert.Equal(message, plaintext);
     }
 }
