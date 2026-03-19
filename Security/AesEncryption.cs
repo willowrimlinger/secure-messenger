@@ -2,6 +2,7 @@
 // CSCI 251 - Secure Distributed Messenger
 
 using System.Security.Cryptography;
+using System.Text;
 
 namespace SecureMessenger.Security;
 
@@ -44,7 +45,11 @@ public class AesEncryption
     /// </summary>
     public static byte[] GenerateKey()
     {
-        throw new NotImplementedException("Implement GenerateKey() - see TODO in comments above");
+        using Aes aes = Aes.Create();
+        aes.KeySize = 256;
+        aes.GenerateKey();
+        byte[] key = aes.Key; 
+        return key;
     }
 
     /// <summary>
@@ -67,7 +72,18 @@ public class AesEncryption
     /// </summary>
     public byte[] Encrypt(string plaintext)
     {
-        throw new NotImplementedException("Implement Encrypt() - see TODO in comments above");
+        using Aes aes = Aes.Create(); 
+        aes.Key = _key; 
+        aes.Mode = CipherMode.CBC; 
+        aes.GenerateIV(); 
+
+        using ICryptoTransform encryptor = aes.CreateEncryptor(); 
+        byte[] textbytes = Encoding.UTF8.GetBytes(plaintext); 
+        byte[] ciphertext = encryptor.TransformFinalBlock(textbytes, 0, textbytes.Length); 
+        byte[] message = new byte[aes.IV.Length + ciphertext.Length];
+        Buffer.BlockCopy(aes.IV, 0, message, 0, aes.IV.Length); 
+        Buffer.BlockCopy(ciphertext, 0, message, aes.IV.Length, message.Length); 
+        return message; 
     }
 
     /// <summary>
@@ -91,6 +107,15 @@ public class AesEncryption
     /// </summary>
     public string Decrypt(byte[] ciphertext)
     {
-        throw new NotImplementedException("Implement Decrypt() - see TODO in comments above");
+        using Aes aes = Aes.Create(); 
+        aes.Key = _key; 
+        aes.Mode = CipherMode.CBC; 
+        Buffer.BlockCopy(ciphertext, 0, aes.IV, 0, 16); 
+        byte[] text = new byte[ciphertext.Length - 16]; 
+        Buffer.BlockCopy(ciphertext, 16, text, 0, ciphertext.Length - 16); 
+        using ICryptoTransform decryptor = aes.CreateDecryptor(); 
+        byte[] plaintext_bytes = decryptor.TransformFinalBlock(ciphertext, 0, ciphertext.Length); 
+        string plaintext = Encoding.UTF8.GetString(plaintext_bytes);
+        return plaintext; 
     }
 }
