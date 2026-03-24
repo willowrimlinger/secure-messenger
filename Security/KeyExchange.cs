@@ -1,4 +1,4 @@
-// [Your Name Here]
+// Alia Ulanbek Kyzy
 // CSCI 251 - Secure Distributed Messenger
 
 using System.Security.Cryptography;
@@ -49,7 +49,15 @@ public class KeyExchange
     /// </summary>
     public KeyExchange()
     {
-        throw new NotImplementedException("Implement constructor - create RsaEncryption instance");
+        try 
+        {
+            _rsa = new RsaEncryption()
+        }
+        catch (CryptographicException ex)
+        {
+            Console.WriteLine($"ERROR: Failed create RsaEncryption instance in KeyExchange - {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -61,7 +69,16 @@ public class KeyExchange
     /// </summary>
     public byte[] GetPublicKey()
     {
-        throw new NotImplementedException("Implement GetPublicKey() - see TODO in comments above");
+        try 
+        {
+            State = ConnectionState.SendingPublicKey;
+            return _rsa.ExportPublicKey();
+        }
+        catch (CryptographicException ex)
+        {
+            Console.WriteLine($"ERROR: Failed to get public key - {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -73,7 +90,16 @@ public class KeyExchange
     /// </summary>
     public void ReceivePublicKey(byte[] peerPublicKey)
     {
-        throw new NotImplementedException("Implement ReceivePublicKey() - see TODO in comments above");
+        try 
+        {
+            _peerPublicKey = peerPublicKey;
+            State = ConnectionState.ReceivingPublicKey;
+        }
+        catch (CryptographicException ex)
+        {
+            Console.WriteLine($"ERROR: Failed to receive public key - {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -88,7 +114,19 @@ public class KeyExchange
     /// </summary>
     public byte[] CreateEncryptedSessionKey()
     {
-        throw new NotImplementedException("Implement CreateEncryptedSessionKey() - see TODO in comments above");
+        try 
+        {
+            byte[] aesKey = AesEncryption.GenerateKey();
+            _sessionKey = aesKey;
+            State = ConnectionState.SendingSessionKey;
+            byte[] encryptedSessionKey = _rsa.EncryptSessionKey(_sessionKey, _peerPublicKey);
+            return encryptedSessionKey;
+        }
+        catch (CryptographicException ex)
+        {
+            Console.WriteLine($"ERROR: Failed to create encrypted session key - {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -101,7 +139,17 @@ public class KeyExchange
     /// </summary>
     public void ReceiveEncryptedSessionKey(byte[] encryptedKey)
     {
-        throw new NotImplementedException("Implement ReceiveEncryptedSessionKey() - see TODO in comments above");
+        try 
+        {
+            byte[] decryptedKey = _rsa.DecryptSessionKey();
+            _sessionKey = decryptedKey;
+            State = ConnectionState.Established;
+        }
+        catch (CryptographicException ex)
+        {
+            Console.WriteLine($"ERROR: Failed to receive encrypted session key - {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -112,7 +160,7 @@ public class KeyExchange
     /// </summary>
     public void Complete()
     {
-        throw new NotImplementedException("Implement Complete() - see TODO in comments above");
+        State = ConnectionState.Established;
     }
 
     /// <summary>
