@@ -1,9 +1,18 @@
-// Sean Gaines
+// Sean Gaines, Alia Ulanbek Kyzy
 // CSCI 251 - Secure Distributed Messenger
 
 namespace SecureMessenger.Core;
 using System.Text.Json; 
 using System.Text;
+
+public enum MessageType
+{
+    Text,           // Regular chat message
+    KeyExchange,    // Sprint 2: Public key exchange
+    SessionKey,     // Sprint 2: Encrypted session key
+    Heartbeat,      // Sprint 3: Connection health check
+    PeerDiscovery   // Sprint 3: Peer announcement
+}
 
 /// <summary>
 /// Represents a message in the system
@@ -19,6 +28,10 @@ public class Message
     // Sprint 2: Security fields
     public byte[]? Signature { get; set; }
     public byte[]? EncryptedContent { get; set; }
+    public byte[]? PublicKey { get; set; }
+
+    // Sprint 3: Target peer for directed messages
+    public string? TargetPeerId { get; set; }
 
     public override string ToString()
     {
