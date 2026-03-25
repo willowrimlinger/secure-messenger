@@ -202,20 +202,8 @@ class Program
 
                     foreach (var peer in _client.GetConnectedPeers())
                     {
-                        Message toSend = msg;
-                        Console.WriteLine("\nTo send: "+ Encoding.UTF8.GetString(toSend.Content) + "\nPeerId: " + peer.Id + "\nType/Peer.Aes?: " + toSend.Type + peer.Aes + "\n");
-
-                        if (msg.Type == MessageType.Text && peer.Aes != null)
-                        {
-                            toSend = new Message {
-                                Sender = msg.Sender,
-                                Type = msg.Type,
-                                Content = peer.Aes.Encrypt(Encoding.UTF8.GetString(msg.Content))
-                            };
-                        }
-// /listen 5000
-// /connect 127.0.0.1 5000
-                        _client.SendAsync(peer.Id, toSend);
+                        Console.WriteLine("\nTo send: "+ Encoding.UTF8.GetString(msg.Content) + "\nPeerId: " + peer.Id + "\nType/Peer.Aes?: " + msg.Type + peer.Aes + "\n");
+                        _client.SendAsync(peer.Id, msg);
                     }
                     // _client.BroadcastAsync(msg); 
                     // if(_server.IsListening)
@@ -294,6 +282,10 @@ class Program
                             }
                             break;
                         case CommandType.ListPeers:
+                            foreach(var peer in _server.GetConnectedPeers())
+                            {
+                                Console.WriteLine(peer); 
+                            }
                             break;
                         case CommandType.History:
                             break;

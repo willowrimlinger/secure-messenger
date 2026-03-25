@@ -19,10 +19,9 @@ public enum MessageType
 /// </summary>
 public class Message
 {
-    private static readonly UTF8Encoding _utf8 = new(); 
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Sender { get; set; } = string.Empty;
-    public byte[] Content { get; set; }
+    public byte[] Content { get; set; } = [];
     public DateTime Timestamp { get; set; } = DateTime.Now;
 
     /// <summary>
@@ -54,7 +53,7 @@ public class Message
     {
         string message = JsonSerializer.Serialize(this); 
         byte[] byteMessage = new byte[message.Length + 4]; 
-        int length = _utf8.GetBytes(
+        int length = Encoding.UTF8.GetBytes(
             message, 0, message.Length, byteMessage, 4
             ); 
         byte[] lenBytes = BitConverter.GetBytes(length); 
