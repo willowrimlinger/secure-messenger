@@ -262,7 +262,8 @@ public class AesTest
         AesEncryption aesEncryption = new AesEncryption(key); 
         string message = "What can the harvest hope for, if not the care of the Reaper Man?";
         byte[] ciphertext = aesEncryption.Encrypt(message); 
-        string plaintext = aesEncryption.Decrypt(ciphertext); 
+        // string plaintext = aesEncryption.Decrypt(ciphertext); 
+        string plaintext = Encoding.UTF8.GetString(aesEncryption.Decrypt(ciphertext));
         Assert.Equal(message, plaintext);
     }
 }

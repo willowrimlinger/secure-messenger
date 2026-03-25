@@ -105,7 +105,7 @@ public class AesEncryption
     /// 6. Convert decrypted bytes to string using UTF8 encoding
     /// 7. Return the plaintext string
     /// </summary>
-    public string Decrypt(byte[] ciphertext)
+    public byte[] Decrypt(byte[] ciphertext)
     {
         using Aes aes = Aes.Create(); 
         aes.Key = _key; 
@@ -114,9 +114,9 @@ public class AesEncryption
         byte[] text = new byte[ciphertext.Length - 16]; 
         Buffer.BlockCopy(ciphertext, 16, text, 0, ciphertext.Length - 16); 
         using ICryptoTransform decryptor = aes.CreateDecryptor(); 
-        byte[] plaintext_bytes = decryptor.TransformFinalBlock(ciphertext, 0, ciphertext.Length)[16..]; 
+        byte[] plaintext = decryptor.TransformFinalBlock(ciphertext, 0, ciphertext.Length)[16..]; 
 
-        string plaintext = Encoding.UTF8.GetString(plaintext_bytes);
+        // string plaintext = Encoding.UTF8.GetString(plaintext_bytes);
         return plaintext; 
     }
 }

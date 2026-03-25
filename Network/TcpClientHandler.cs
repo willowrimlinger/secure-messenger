@@ -141,7 +141,7 @@ public class TcpClientHandler
 
                 if(!peer.IsConnected)
                     break; 
-
+                
                 string line = Encoding.UTF8.GetString(byteMessage, 0, length);
 
                 if (line == null)
@@ -151,7 +151,7 @@ public class TcpClientHandler
                 /// Creates a new message object with the received content
                 Message message = JsonSerializer.Deserialize<Message>(line);
                 /// Invokes the message received event
-                Console.WriteLine("invoking in re lo");
+                Console.WriteLine("invoking in re");
                 OnMessageReceived?.Invoke(peer, message);
             }
         }
@@ -196,7 +196,6 @@ public class TcpClientHandler
             try
             {
                 byte[] byteMessage = message.ToByteArray(); 
-                // byte[] byteMessage = message.Content;
                 /// Creates a stream writer to send the message to the peer
                 var writer = peer.Stream;
                 /// Writes the message line asynchronously

@@ -160,7 +160,8 @@ class Program
 
             if (msg.Type == MessageType.Text && peer.Aes != null)
             {
-                msg.Content = Encoding.UTF8.GetBytes(peer.Aes.Decrypt(msg.Content));
+                // msg.Content = Encoding.UTF8.GetBytes(peer.Aes.Decrypt(msg.Content));
+                msg.Content = peer.Aes.Decrypt(msg.Content);
             }
 
             _messageQueue.EnqueueIncoming(msg);
