@@ -17,7 +17,7 @@ namespace SecureMessenger.Network;
 public class TcpServer
 {
     private TcpListener? _listener;
-    private readonly List<Peer> _connectedPeers = new();
+    private readonly Dictionary<string, Peer> _connectedPeers = new();
     private object _connectedPeersLock = new object();
     private CancellationTokenSource? _cancellationTokenSource;
     private Thread? _listenThread;
@@ -128,7 +128,7 @@ public class TcpServer
         peer.IsConnected = true;
 
         lock (_connectedPeersLock) {
-            this._connectedPeers.Add(peer);
+            this._connectedPeers.Add(peer.Id, peer);
         }
 
         this.OnPeerConnected(peer);
@@ -232,7 +232,7 @@ public class TcpServer
         } 
         finally 
         {
-            this.DisconnectPeer(peer);
+            this.DisconnectPeer(peer.Id);
         }
     }
 
@@ -240,20 +240,23 @@ public class TcpServer
     /// Broadcast a message to all connected peers, except for its source
     public async Task BroadcastAsync(Message message)
     {
-        List<Peer> peers; 
+        Dictionary<string, Peer> peers; 
 
         lock(_connectedPeersLock)
         {
             peers = new(_connectedPeers); 
         }
 
-        foreach (Peer receiver in peers)
+        foreach (var peer in peers)
         {
+            var receiver = peer.Value; 
             if (receiver == null || !receiver.IsConnected || receiver.Stream == null) continue; 
             if ($"{receiver.Address}:{receiver.Port}" == message.Sender) continue; 
             try
             {
                 var writer = receiver.Stream; 
+                message.EncryptedContent = receiver.Aes?.Encrypt(message.Content); 
+                message.Content = ""; 
                 byte[] byteMessage = message.ToByteArray(); 
                 await writer.WriteAsync(byteMessage, 0, byteMessage.Length); 
                 writer.FlushAsync(); 
@@ -265,6 +268,46 @@ public class TcpServer
         }
     }
 
+    public async Task SendAsync(string peerId, Message message)
+    {
+        /// Looks up the peer in the connections dictionary
+        Peer? peer;
+        /// Locks threads to only allow one thread to access the connections dictionary at a time
+        lock (_connectedPeersLock)
+        {
+            _connectedPeers.TryGetValue(peerId, out peer); 
+        }
+        /// Sends the message if the peer is connected and has a valid stream
+        if (peer != null && peer.IsConnected && peer.Stream != null)
+        {
+            try
+            {
+                byte[] byteMessage = message.ToByteArray(); 
+                /// Creates a stream writer to send the message to the peer
+                var writer = peer.Stream;
+                /// Writes the message line asynchronously
+                await writer.WriteAsync(byteMessage, 0, byteMessage.Length);
+                /// Flushes the writer to ensure the message is sent
+                await writer.FlushAsync();
+            }
+            catch (IOException ex)
+            {
+                System.Console.WriteLine($"Error sending to peer {peerId}: {ex.Message}");
+                DisconnectPeer(peerId);
+            }
+        }
+    }
+
+    public Peer? GetPeer(string peerId)
+    {
+        Peer? peer;  
+        lock (_connectedPeersLock)
+        {
+            _connectedPeers.TryGetValue(peerId, out peer); 
+        }
+        return peer; 
+    }
+
     /// <summary>
     /// Clean up a disconnected peer.
     ///
@@ -273,8 +316,13 @@ public class TcpServer
     /// 3. Remove the peer from _connectedPeers (with proper locking)
     /// 4. Invoke OnPeerDisconnected event
     /// </summary>
-    private void DisconnectPeer(Peer peer)
+    private void DisconnectPeer(string peerId)
     {
+        Peer? peer; 
+        lock (_connectedPeersLock)
+        {
+            _connectedPeers.TryGetValue(peerId, out peer); 
+        }
         peer.IsConnected = false;
         if (peer.Client is not null) {
             peer.Client.Dispose();
@@ -283,7 +331,7 @@ public class TcpServer
             peer.Stream.Dispose();
         }
         lock (this._connectedPeersLock) {
-            this._connectedPeers.Remove(peer);
+            this._connectedPeers.Remove(peerId);
         }
         if (this.OnPeerDisconnected is not null) {
             this.OnPeerDisconnected(peer);
@@ -324,7 +372,7 @@ public class TcpServer
     {
         lock (_connectedPeersLock)
         {
-            return _connectedPeers.ToList();
+            return _connectedPeers.Values.ToList();
         }
     }
 }

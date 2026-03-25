@@ -21,7 +21,7 @@ public class Message
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Sender { get; set; } = string.Empty;
-    public byte[] Content { get; set; } = [];
+    public string Content { get; set; } = string.Empty;
     public DateTime Timestamp { get; set; } = DateTime.Now;
 
     /// <summary>
@@ -41,7 +41,26 @@ public class Message
 
     public override string ToString()
     {
-        return $"[{Timestamp:HH:mm:ss}] {Sender}: {Encoding.UTF8.GetString(Content)}";
+        return $"[{Timestamp:HH:mm:ss}] {Sender}: {Content}";
+    }
+
+    public void printLong()
+    {
+        Console.WriteLine(JsonSerializer.Serialize(this)); 
+    }
+
+    public Message() {}
+
+    public Message(Message o)
+    {
+        Sender = o.Sender; 
+        Content = o.Content; 
+        Timestamp = o.Timestamp; 
+        Type = o.Type; 
+        Signature = o.Signature; 
+        EncryptedContent = o.EncryptedContent; 
+        PublicKey = o.PublicKey; 
+        TargetPeerId = o.TargetPeerId; 
     }
 
     /// <summary> 

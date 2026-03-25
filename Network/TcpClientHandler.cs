@@ -98,7 +98,6 @@ public class TcpClientHandler
     {
         try
         {
-            Console.WriteLine("in receive loop");
             var reader = peer.Stream;
             /// Loops while the peer is still connected
             
@@ -151,7 +150,6 @@ public class TcpClientHandler
                 /// Creates a new message object with the received content
                 Message message = JsonSerializer.Deserialize<Message>(line);
                 /// Invokes the message received event
-                Console.WriteLine("invoking in re");
                 OnMessageReceived?.Invoke(peer, message);
             }
         }
@@ -182,7 +180,7 @@ public class TcpClientHandler
     /// </summary>
     public async Task SendAsync(string peerId, Message message)
     {
-        Console.WriteLine("\nSendAsync function!");
+        //message.printLong(); 
         /// Looks up the peer in the connections dictionary
         Peer? peer;
         /// Locks threads to only allow one thread to access the connections dictionary at a time
@@ -208,6 +206,10 @@ public class TcpClientHandler
                 System.Console.WriteLine($"Error sending to peer {peerId}: {ex.Message}");
                 Disconnect(peerId);
             }
+        }
+        else
+        {
+            Console.Write($"Failed to acquire Peer: {peerId}");
         }
     }
 
@@ -272,6 +274,16 @@ public class TcpClientHandler
                 Disconnect(peer);
             }
         }
+    }
+
+    public Peer? GetPeer(string peerId)
+    {
+        Peer peer; 
+        lock (_lock)
+        {
+            _connections.TryGetValue(peerId, out peer); 
+        }
+        return peer; 
     }
 
     /// <summary>

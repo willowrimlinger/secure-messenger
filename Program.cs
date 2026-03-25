@@ -92,7 +92,6 @@ class Program
         // 4. TcpClientHandler events (same pattern)
 
         // Sprint 2:
-        byte[] publicKey;
 
         _myRsa = new RsaEncryption();
         _myPublicKey = _myRsa.ExportPublicKey();
@@ -100,13 +99,37 @@ class Program
         _server.OnPeerConnected += (peer) => 
         { 
             _consoleUI.DisplaySystem($"Client connected: {peer}");
+            Message keyExchange = new Message
+            {
+                Sender = _myId, 
+                Type = MessageType.KeyExchange, 
+                PublicKey = _myPublicKey,
+                TargetPeerId = peer.Id
+            }; 
+            _messageQueue.EnqueueOutgoing(keyExchange); 
         };
 
         _server.OnMessageReceived += (peer, msg) => 
         {
-            // we are not displaying messages, just sending out to different peers
-            // _consoleUI.DisplayMessage(msg);
-            _messageQueue.EnqueueOutgoing(msg);
+            if(msg.Type == MessageType.Text && peer.Aes != null)
+            {
+                msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent)); 
+                msg.EncryptedContent = null; 
+                _consoleUI.DisplayMessage(msg);
+                _messageQueue.EnqueueOutgoing(msg);
+            }
+            if(msg.Type == MessageType.KeyExchange)
+            {
+                peer.PublicKey = msg.PublicKey; 
+                peer.PeerRsa = new RsaEncryption(); 
+                peer.PeerRsa.ImportPublicKey(peer.PublicKey); 
+            }
+            if(msg.Type == MessageType.SessionKey)
+            {
+                byte[] key = _myRsa.DecryptSessionKey(msg.EncryptedContent); 
+                peer.AesKey = key; 
+                peer.Aes = new AesEncryption(peer.AesKey); 
+            }
         };
 
         _server.OnPeerDisconnected += (peer) => 
@@ -116,56 +139,42 @@ class Program
 
         _client.OnConnected += (peer) =>  
         {
-            // Sprint 2: Generate RSA Key Pair
-            // RSA _rsa = new RsaEncryption();
-            // // get public key
-            // byte[] _publicKey = _rsa.ExportPublicKey();
-            // broadcast publicKey as message:
-            Message msg = new Message{
-                Sender = _myId,
-                Type = MessageType.KeyExchange,
-                Content = _myPublicKey
-            }; 
-            _messageQueue.EnqueueOutgoing(msg); 
             _consoleUI.DisplaySystem($"Connected to Server: {peer}");
         };
 
         _client.OnMessageReceived += (peer, msg) => 
         {
-            Console.WriteLine("in on message received");
             if (msg.Type == MessageType.KeyExchange ) 
             {
-                peer.PublicKey = msg.Content;
+                peer.PublicKey = msg.PublicKey;
                 peer.PeerRsa = new RsaEncryption();
                 peer.PeerRsa.ImportPublicKey(peer.PublicKey);
-                if (peer.Aes == null && _myId.CompareTo(msg.Sender) < 0)
-                {
-                    peer.AesKey = AesEncryption.GenerateKey();
-                    peer.Aes = new AesEncryption(peer.AesKey);
-                    byte[] encryptedSessionKey = peer.PeerRsa.EncryptSessionKey(peer.AesKey, peer.PublicKey);
-                    Message response = new Message {
-                        Sender = _myId,
-                        Type = MessageType.SessionKey,
-                        Content = encryptedSessionKey
-                    }; 
-                    _messageQueue.EnqueueIncoming(response);
-                }
+                
+
+                peer.AesKey = AesEncryption.GenerateKey();
+                peer.Aes = new AesEncryption(peer.AesKey);
+                byte[] encryptedSessionKey = peer.PeerRsa.EncryptSessionKey(peer.AesKey, peer.PublicKey);
+                Message response = new Message {
+                    Sender = _myId,
+                    Type = MessageType.SessionKey,
+                    EncryptedContent = encryptedSessionKey, 
+                    TargetPeerId = peer.Id
+                }; 
+                _messageQueue.EnqueueOutgoing(response);
             }
             else if (msg.Type == MessageType.SessionKey) 
             {
-                byte[] decryptedKey = _myRsa.DecryptSessionKey(msg.Content);
+                byte[] decryptedKey = _myRsa.DecryptSessionKey(msg.EncryptedContent);
                 peer.AesKey = decryptedKey;
                 peer.Aes = new AesEncryption(peer.AesKey);
             }
 
             if (msg.Type == MessageType.Text && peer.Aes != null)
             {
-                // msg.Content = Encoding.UTF8.GetBytes(peer.Aes.Decrypt(msg.Content));
-                msg.Content = peer.Aes.Decrypt(msg.Content);
+                msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent));
             }
 
             _messageQueue.EnqueueIncoming(msg);
-            Console.WriteLine("ADDED TO EN INCOMING!!");
         };
 
         _client.OnDisconnected += (peer) => 
@@ -182,7 +191,9 @@ class Program
             {
                 while (!_cancellationTokenSource!.IsCancellationRequested)
                 {
-                    _consoleUI.DisplayMessage(_messageQueue.DequeueIncoming(_cancellationTokenSource.Token));
+                    Message msg = _messageQueue.DequeueIncoming(_cancellationTokenSource.Token);
+                    if(msg.Type == MessageType.Text)
+                        _consoleUI.DisplayMessage(msg);
                 }
             } catch (OperationCanceledException)
             {
@@ -199,15 +210,62 @@ class Program
                 while (!_cancellationTokenSource!.IsCancellationRequested)
                 {
                     Message msg = _messageQueue.DequeueOutgoing();
+                    //msg.printLong(); 
 
-                    foreach (var peer in _client.GetConnectedPeers())
+                    Peer? peer; 
+                    if(msg.TargetPeerId != null && 
+                       ((peer = _client.GetPeer(msg.TargetPeerId)) != null))
                     {
-                        Console.WriteLine("\nTo send: "+ Encoding.UTF8.GetString(msg.Content) + "\nPeerId: " + peer.Id + "\nType/Peer.Aes?: " + msg.Type + peer.Aes + "\n");
-                        _client.SendAsync(peer.Id, msg);
+                        if(msg.Type == MessageType.Text)
+                        {
+                            msg.EncryptedContent = peer.Aes.Encrypt(msg.Content);  
+                            msg.Content = ""; 
+                        }
+                        _ = _client.SendAsync(msg.TargetPeerId, msg); 
                     }
-                    // _client.BroadcastAsync(msg); 
-                    // if(_server.IsListening)
-                    //     _server.BroadcastAsync(msg);
+                    else
+                    {
+                        foreach(Peer p in _client.GetConnectedPeers())
+                        {
+                            Message send = new(msg); 
+                            if(msg.Type == MessageType.Text)
+                            {
+                                send.EncryptedContent = p.Aes.Encrypt(msg.Content);  
+                                send.Content = ""; 
+                            }
+                            _ = _client.SendAsync(p.Id, send); 
+                        }
+                    }
+
+                    if(_server.IsListening) 
+                    {
+                        if(msg.TargetPeerId != null && 
+                        ((peer = _server.GetPeer(msg.TargetPeerId)) != null))
+                        {
+                            if(msg.Type == MessageType.Text)
+                            {
+                                msg.EncryptedContent = peer.Aes.Encrypt(msg.Content);  
+                                msg.Content = ""; 
+                            }
+                            _ = _server.SendAsync(msg.TargetPeerId, msg); 
+                        }
+                        else
+                        {
+                            foreach(Peer p in _server.GetConnectedPeers())
+                            {
+                                Message send = new(msg); 
+
+                                if(msg.Type == MessageType.Text)
+                                {
+                                    send.EncryptedContent = p.Aes.Encrypt(msg.Content);  
+                                    send.Content = ""; 
+                                }
+                                _ = _server.SendAsync(p.Id, send); 
+                            }
+                        }
+                    }
+
+                    
                 }
             }
             catch (OperationCanceledException)
@@ -255,7 +313,7 @@ class Program
                         Message msg = new Message {
                             Sender = _myId,
                             Type = MessageType.Text,
-                            Content = Encoding.UTF8.GetBytes(parsed_input.Message)
+                            Content = parsed_input.Message
                         }; 
                         _messageQueue.EnqueueOutgoing(msg); 
                         continue; 
