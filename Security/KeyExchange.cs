@@ -51,7 +51,7 @@ public class KeyExchange
     {
         try 
         {
-            _rsa = new RsaEncryption()
+            _rsa = new RsaEncryption();
         }
         catch (CryptographicException ex)
         {
@@ -141,7 +141,7 @@ public class KeyExchange
     {
         try 
         {
-            byte[] decryptedKey = _rsa.DecryptSessionKey();
+            byte[] decryptedKey = _rsa.DecryptSessionKey(encryptedKey);
             _sessionKey = decryptedKey;
             State = ConnectionState.Established;
         }

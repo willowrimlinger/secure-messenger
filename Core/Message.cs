@@ -22,8 +22,15 @@ public class Message
     private static readonly UTF8Encoding _utf8 = new(); 
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Sender { get; set; } = string.Empty;
-    public string Content { get; set; } = string.Empty;
+    public byte[] Content { get; set; }
     public DateTime Timestamp { get; set; } = DateTime.Now;
+
+    /// <summary>
+    /// Message type - determines how the message is processed.
+    /// Sprint 1: Always MessageType.Text
+    /// Sprint 2-3: Use other types for protocol messages
+    /// </summary>
+    public MessageType Type { get; set; } = MessageType.Text;
 
     // Sprint 2: Security fields
     public byte[]? Signature { get; set; }
@@ -35,7 +42,7 @@ public class Message
 
     public override string ToString()
     {
-        return $"[{Timestamp:HH:mm:ss}] {Sender}: {Content}";
+        return $"[{Timestamp:HH:mm:ss}] {Sender}: {Encoding.UTF8.GetString(Content)}";
     }
 
     /// <summary> 

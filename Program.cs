@@ -12,6 +12,7 @@ using SecureMessenger.Network;
 using SecureMessenger.Security;
 using SecureMessenger.UI;
 using System.Text.Json; 
+using System.Text;
 
 namespace SecureMessenger;
 
@@ -61,6 +62,11 @@ class Program
     private static TcpClientHandler? _client;
     private static ConsoleUI? _consoleUI;
     private static CancellationTokenSource? _cancellationTokenSource;
+    private static RsaEncryption? _myRsa;
+    private static byte[] _myPublicKey;
+
+    // current peer id 
+    private static string _myId = Guid.NewGuid().ToString();
 
     static async Task Main(string[] args)
     {
@@ -79,10 +85,17 @@ class Program
         _client = new TcpClientHandler();
         _cancellationTokenSource = new CancellationTokenSource();
 
+
         // 1. TcpServer.OnPeerConnected - handle new incoming connections
         // 2. TcpServer.OnMessageReceived - handle received messages
         // 3. TcpServer.OnPeerDisconnected - handle disconnections
         // 4. TcpClientHandler events (same pattern)
+
+        // Sprint 2:
+        byte[] publicKey;
+
+        _myRsa = new RsaEncryption();
+        _myPublicKey = _myRsa.ExportPublicKey();
 
         _server.OnPeerConnected += (peer) => 
         { 
@@ -91,7 +104,8 @@ class Program
 
         _server.OnMessageReceived += (peer, msg) => 
         {
-            _consoleUI.DisplayMessage(msg);
+            // we are not displaying messages, just sending out to different peers
+            // _consoleUI.DisplayMessage(msg);
             _messageQueue.EnqueueOutgoing(msg);
         };
 
@@ -102,12 +116,55 @@ class Program
 
         _client.OnConnected += (peer) =>  
         {
+            // Sprint 2: Generate RSA Key Pair
+            // RSA _rsa = new RsaEncryption();
+            // // get public key
+            // byte[] _publicKey = _rsa.ExportPublicKey();
+            // broadcast publicKey as message:
+            Message msg = new Message{
+                Sender = _myId,
+                Type = MessageType.KeyExchange,
+                Content = _myPublicKey
+            }; 
+            _messageQueue.EnqueueOutgoing(msg); 
             _consoleUI.DisplaySystem($"Connected to Server: {peer}");
         };
 
         _client.OnMessageReceived += (peer, msg) => 
         {
+            Console.WriteLine("in on message received");
+            if (msg.Type == MessageType.KeyExchange ) 
+            {
+                peer.PublicKey = msg.Content;
+                peer.PeerRsa = new RsaEncryption();
+                peer.PeerRsa.ImportPublicKey(peer.PublicKey);
+                if (peer.Aes == null && _myId.CompareTo(msg.Sender) < 0)
+                {
+                    peer.AesKey = AesEncryption.GenerateKey();
+                    peer.Aes = new AesEncryption(peer.AesKey);
+                    byte[] encryptedSessionKey = peer.PeerRsa.EncryptSessionKey(peer.AesKey, peer.PublicKey);
+                    Message response = new Message {
+                        Sender = _myId,
+                        Type = MessageType.SessionKey,
+                        Content = encryptedSessionKey
+                    }; 
+                    _messageQueue.EnqueueIncoming(response);
+                }
+            }
+            else if (msg.Type == MessageType.SessionKey) 
+            {
+                byte[] decryptedKey = _myRsa.DecryptSessionKey(msg.Content);
+                peer.AesKey = decryptedKey;
+                peer.Aes = new AesEncryption(peer.AesKey);
+            }
+
+            if (msg.Type == MessageType.Text && peer.Aes != null)
+            {
+                msg.Content = Encoding.UTF8.GetBytes(peer.Aes.Decrypt(msg.Content));
+            }
+
             _messageQueue.EnqueueIncoming(msg);
+            Console.WriteLine("ADDED TO EN INCOMING!!");
         };
 
         _client.OnDisconnected += (peer) => 
@@ -140,10 +197,28 @@ class Program
             {
                 while (!_cancellationTokenSource!.IsCancellationRequested)
                 {
-                    Message msg = _messageQueue.DequeueOutgoing(); 
-                    _client.BroadcastAsync(msg); 
-                    if(_server.IsListening)
-                        _server.BroadcastAsync(msg);
+                    Message msg = _messageQueue.DequeueOutgoing();
+
+                    foreach (var peer in _client.GetConnectedPeers())
+                    {
+                        Message toSend = msg;
+                        Console.WriteLine("\nTo send: "+ Encoding.UTF8.GetString(toSend.Content) + "\nPeerId: " + peer.Id + "\nType/Peer.Aes?: " + toSend.Type + peer.Aes + "\n");
+
+                        if (msg.Type == MessageType.Text && peer.Aes != null)
+                        {
+                            toSend = new Message {
+                                Sender = msg.Sender,
+                                Type = msg.Type,
+                                Content = peer.Aes.Encrypt(Encoding.UTF8.GetString(msg.Content))
+                            };
+                        }
+// /listen 5000
+// /connect 127.0.0.1 5000
+                        _client.SendAsync(peer.Id, toSend);
+                    }
+                    // _client.BroadcastAsync(msg); 
+                    // if(_server.IsListening)
+                    //     _server.BroadcastAsync(msg);
                 }
             }
             catch (OperationCanceledException)
@@ -188,9 +263,11 @@ class Program
 
                     var parsed_input = _consoleUI.ParseCommand(input);
                     if (!parsed_input.IsCommand) {
-                        Message msg = new Message(); 
-                        //msg.Sender = TODO: sender info
-                        msg.Content = parsed_input.Message; 
+                        Message msg = new Message {
+                            Sender = _myId,
+                            Type = MessageType.Text,
+                            Content = Encoding.UTF8.GetBytes(parsed_input.Message)
+                        }; 
                         _messageQueue.EnqueueOutgoing(msg); 
                         continue; 
                     }
@@ -200,7 +277,6 @@ class Program
                         case CommandType.Connect:
                             
                             await _client!.ConnectAsync(parsed_input.Args[0], int.Parse(parsed_input.Args[1]));
-
                             break;
                         case CommandType.Listen:
                             if (!_server.IsListening) {

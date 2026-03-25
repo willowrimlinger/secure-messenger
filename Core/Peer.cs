@@ -3,6 +3,8 @@
 
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
+using SecureMessenger.Security;
 
 namespace SecureMessenger.Core;
 
@@ -25,6 +27,8 @@ public class Peer
     // Sprint 2: Per-session encryption keys
     public byte[]? AesKey { get; set; }
     public byte[]? PublicKey { get; set; }
+    public RsaEncryption? PeerRsa { get; set; }
+    public AesEncryption? Aes { get; set; }
 
     public override string ToString()
     {

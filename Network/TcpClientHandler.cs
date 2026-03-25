@@ -98,6 +98,7 @@ public class TcpClientHandler
     {
         try
         {
+            Console.WriteLine("in receive loop");
             var reader = peer.Stream;
             /// Loops while the peer is still connected
             
@@ -150,6 +151,7 @@ public class TcpClientHandler
                 /// Creates a new message object with the received content
                 Message message = JsonSerializer.Deserialize<Message>(line);
                 /// Invokes the message received event
+                Console.WriteLine("invoking in re lo");
                 OnMessageReceived?.Invoke(peer, message);
             }
         }
@@ -180,6 +182,7 @@ public class TcpClientHandler
     /// </summary>
     public async Task SendAsync(string peerId, Message message)
     {
+        Console.WriteLine("\nSendAsync function!");
         /// Looks up the peer in the connections dictionary
         Peer? peer;
         /// Locks threads to only allow one thread to access the connections dictionary at a time
@@ -193,6 +196,7 @@ public class TcpClientHandler
             try
             {
                 byte[] byteMessage = message.ToByteArray(); 
+                // byte[] byteMessage = message.Content;
                 /// Creates a stream writer to send the message to the peer
                 var writer = peer.Stream;
                 /// Writes the message line asynchronously

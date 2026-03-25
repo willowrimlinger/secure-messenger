@@ -2,6 +2,7 @@ using SecureMessenger.Network;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
+using System.Text;
 using SecureMessenger.Core;
 using SecureMessenger.Security;
 using System.Runtime.Intrinsics.Arm;
@@ -71,7 +72,7 @@ public class MessagingTests
         /// When receiver gets a message, save the content and signal that we got it
         receiver.OnMessageReceived += (_, msg) =>
         {
-            receivedContent = msg.Content;
+            receivedContent = Encoding.UTF8.GetString(msg.Content);
             receiverGotMessage.Set();
         };
         /// Start the server and connect both sender and receiver to it
@@ -86,7 +87,7 @@ public class MessagingTests
         {
             Id = Guid.NewGuid(),
             Sender = "test",
-            Content = "hello world",
+            Content = Encoding.UTF8.GetBytes("hello world"),
             Timestamp = DateTime.Now
         };
         await sender.SendAsync(senderPeerId!, outgoing);
@@ -201,7 +202,7 @@ public class LoadTests
 
                 client.OnMessageReceived += (_, msg) =>
                 {
-                    if (msg.Content == "load-test")
+                    if (Encoding.UTF8.GetString(msg.Content) == "load-test")
                     {
                         Interlocked.Increment(ref receivedCount);
                         clientGotBroadcast[idx].Set();
@@ -226,7 +227,7 @@ public class LoadTests
             {
                 Id = Guid.NewGuid(),
                 Sender = "load-test-sender",
-                Content = "load-test",
+                Content = Encoding.UTF8.GetBytes("load-test"),
                 Timestamp = DateTime.Now
             };
 
