@@ -39,6 +39,11 @@ public class RsaEncryption
         _rsa = RSA.Create(2048);
     }
 
+    public RSA GetRSA()
+    {
+        return _rsa; 
+    }
+
     /// <summary>
     /// Export our public key to send to a peer.
     ///
