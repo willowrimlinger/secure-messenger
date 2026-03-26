@@ -350,6 +350,16 @@ class Program
                         case CommandType.Quit:
                             running = false;
                             break;
+                        case CommandType.CreateRoom:
+                            break;
+                        case CommandType.JoinRoom:
+                            break;
+                        case CommandType.LeaveRoom:
+                            break;
+                        case CommandType.ListRooms:
+                            break;
+                        case CommandType.SendToRoom:
+                            break;
                         case CommandType.Unknown:
                             Console.WriteLine($"\n{parsed_input.Message}. Please try again!\n");
                             break;

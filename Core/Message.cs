@@ -35,6 +35,7 @@ public class Message
     public byte[]? Signature { get; set; }
     public byte[]? EncryptedContent { get; set; }
     public byte[]? PublicKey { get; set; }
+    public string? RoomId { get; set; }
 
     // Sprint 3: Target peer for directed messages
     public string? TargetPeerId { get; set; }
