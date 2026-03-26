@@ -67,6 +67,34 @@ class Program
 
     // current peer id 
     private static string _myId = Guid.NewGuid().ToString();
+    private static readonly Dictionary<string, HashSet<string>> _rooms = new ();
+    private static readonly object _roomLock = new object();
+    // Helper functions
+    private static void RemovePeerFromAllRooms(string peerId)
+    {
+        lock (_roomsLock)
+        {
+            var emptyRooms = new List<string>();
+
+            foreach (var room in _rooms)
+            {
+                room.Value.Remove(peerId);
+                if (room.Value.Count == 0)
+                    emptyRooms.Add(room.Key);
+            }
+
+            foreach (string roomId in emptyRooms)
+                _rooms.Remove(roomId);
+        }
+    }
+
+    private static Peer? FindPeerById(string peerId)
+    {
+        Peer? peer = _client?.GetPeer(peerId);
+        if (peer != null) return peer;
+
+        return _server?.GetPeer(peerId);
+    }
 
     static async Task Main(string[] args)
     {
@@ -134,6 +162,7 @@ class Program
 
         _server.OnPeerDisconnected += (peer) => 
         {
+            RemovePeerFromAllRooms(peer.Id);
             _consoleUI.DisplaySystem($"Client disconnected: {peer}");
         };
 
@@ -179,6 +208,7 @@ class Program
 
         _client.OnDisconnected += (peer) => 
         {
+            RemovePeerFromAllRooms(peer.Id);
             _consoleUI.DisplaySystem($"Disconnect from server: {peer}");
         };
 
@@ -351,15 +381,123 @@ class Program
                             running = false;
                             break;
                         case CommandType.CreateRoom:
+                            {
+                                string roomID = parsed_input.Args[0];
+                                lock(_roomLock)
+                                {
+                                    if(!_rooms.ContainsKey(roomID))
+                                    {
+                                        _rooms[roomID] = new HashSet<string>();
+                                        _consoleUI.DisplaySystem($"Room {roomID} created");
+                                    }
+                                    else
+                                    {
+                                        _consoleUI.DisplaySystem($"Room {roomID} already exists");
+                                    }
+                                }
                             break;
+                            }
                         case CommandType.JoinRoom:
+                            {
+                                string roomID = parsed_input.Args[0];
+                                lock(_roomsLock)
+                                {
+                                    if(!_rooms.ContainsKey(roomID))
+                                    {
+                                        _consoleUI.DisplaySystem($"Room {roomID} does not exist");
+                                        break;
+                                    }
+                                    if(_rooms[roomID].Add(peerID))
+                                    {
+                                        _consoleUI.DisplaySystem($"Joined room {roomID}");
+                                    }
+                                    else
+                                    {
+                                        _consoleUI.DisplaySystem($"Already in room {roomID}");
+                                    }
+                                }
                             break;
+                            }
                         case CommandType.LeaveRoom:
+                            {
+                                string roomID = parsed_input.Args[0];
+                                lock(_roomsLock)
+                                {
+                                    if(!_rooms.ContainsKey(roomID))
+                                    {
+                                        _consoleUI.DisplaySystem($"Room {roomID} does not exist");
+                                        break;
+                                    }
+                                    if(_rooms[roomID].Remove(peerID))
+                                    {
+                                        _consoleUI.DisplaySystem($"Left room {roomID}");
+                                    }
+                                    else
+                                    {
+                                        _consoleUI.DisplaySystem($"Not in room {roomID}");
+                                    }
+                                }
+                            }
                             break;
                         case CommandType.ListRooms:
+                            {
+                                lock(_roomsLock)
+                                {
+                                    if(_rooms.Count == 0)
+                                    {
+                                        _consoleUI.DisplaySystem("No rooms available");
+                                        break;
+                                    }
+                                    foreach(var room in _rooms)
+                                    {
+                                        Console.WriteLine($"{room.Key} ({room.Value.Count} members)");
+                                    }
+                                }
+                            }
                             break;
                         case CommandType.SendToRoom:
+                    
+                            {
+                                string roomId = parsed_input.Args[0];
+                                string content = string.Join(" ", parsed_input.Args.Skip(1));
+
+                                List<string> roomPeerIds;
+
+                                lock (_roomsLock)
+                                {
+                                    if (!_rooms.ContainsKey(roomId))
+                                    {
+                                        _consoleUI.DisplaySystem($"Room '{roomId}' does not exist.");
+                                        break;
+                                    }
+
+                                    roomPeerIds = _rooms[roomId].ToList();
+                                }
+
+                                if (roomPeerIds.Count == 0)
+                                {
+                                    _consoleUI.DisplaySystem($"Room '{roomId}' is empty.");
+                                    break;
+                                }
+
+                                foreach (string peerId in roomPeerIds)
+                                {
+                                    if (FindPeerById(peerId) == null)
+                                        continue;
+
+                                    Message msg = new Message
+                                    {
+                                        Sender = _myId,
+                                        Type = MessageType.Text,
+                                        Content = content,
+                                        TargetPeerId = peerId
+                                    };
+
+                                    _messageQueue.EnqueueOutgoing(msg);
+                                }
+                            }
                             break;
+                    }
                         case CommandType.Unknown:
                             Console.WriteLine($"\n{parsed_input.Message}. Please try again!\n");
                             break;
@@ -367,7 +505,6 @@ class Program
                             break;
                     }
                     break;
-            }
         }
 
         // 1. Cancel the CancellationTokenSource
