@@ -8,7 +8,7 @@
 - Michael Reizenstein - [Role/Responsibilities]
 - Sean Gaines - [Role/Responsibilities]
 
-**Date:** [Submission Date]
+**Date: 3/27/26**
 
 ---
 
@@ -25,23 +25,24 @@
 #### Key Exchange Process
 [Describe step-by-step how keys are exchanged when two peers connect]
 
-1. [Step 1]
-2. [Step 2]
-3. [Step 3]
-4. ...
+1. Client 1 creates a RSA key pair
+2. Client 1 sends out their public key
+3. Client 2 stores Client 1's public key
+4. Client 2 generates and Encrypts the AES session key with Client 1's public key
+5. Client 1 decrypts the sent AES session key with their own private key
 
 #### Message Encryption
 [Describe how messages are encrypted before sending]
-
-- **Algorithm:** [e.g., AES-256-CBC]
-- **Key Size:** [e.g., 256 bits]
-- **IV Generation:** [How IVs are generated]
+- **Before we send the message out the server we encrypt the message using the AES-256-CBC algorithm**
+- **Algorithm: AES-256-CBC** [e.g., AES-256-CBC]
+- **Key Size: 32 bytes (256 bits)** 
+- **IV Generation: We use the System.Security.Cryptography to randomly generate our 16 byte IV**
 
 #### Message Signing
 [Describe how messages are signed and verified]
-
-- **Algorithm:** [e.g., RSA with SHA-256]
-- **Key Size:** [e.g., 2048 bits]
+- **When signing a message the first thing that happens is that we create an RSA instance and then when signing the data we use the built in rsa.SignData which uses the current private key and returns the messanger signature that has been hashed and padded**
+- **Algorithm: RSA with SHA-256** 
+- **Key Size: 2048** 
 
 ---
 
