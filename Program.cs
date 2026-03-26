@@ -14,6 +14,7 @@ using SecureMessenger.UI;
 using System.Text.Json; 
 using System.Text;
 using System.Net.WebSockets;
+using System.Security.Cryptography;
 
 namespace SecureMessenger;
 
@@ -65,6 +66,7 @@ class Program
     private static CancellationTokenSource? _cancellationTokenSource;
     private static RsaEncryption? _myRsa;
     private static byte[]? _myPublicKey;
+    private static MessageSigner? _signer; 
     // current peer id 
     private static string _myId = Guid.NewGuid().ToString();
     private static Rooms _rooms = new(); 
@@ -86,6 +88,7 @@ class Program
         _server = new TcpServer();
         _client = new TcpClientHandler();
         _cancellationTokenSource = new CancellationTokenSource();
+        
 
 
         // 1. TcpServer.OnPeerConnected - handle new incoming connections
@@ -97,6 +100,8 @@ class Program
 
         _myRsa = new RsaEncryption();
         _myPublicKey = _myRsa.ExportPublicKey();
+
+        _signer = new MessageSigner(_myRsa.GetRSA());
 
         _server.OnPeerConnected += (peer) => 
         { 
@@ -113,6 +118,17 @@ class Program
 
         _server.OnMessageReceived += (peer, msg) => 
         {
+            if(peer.PeerRsa != null)
+            {
+                RSA rsa = RSA.Create(2048);
+
+                bool verified = _signer.VerifyData(msg.EncryptedContent, msg.Signature, peer.PublicKey);
+                if(!verified)
+                {
+                    Console.WriteLine($"Failed to validate signature for message: {msg.Id}"); 
+                    return; 
+                }
+            }
             if(msg.Type == MessageType.Text && peer.Aes != null)
             {
                 msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent)); 
@@ -186,6 +202,16 @@ class Program
 
         _client.OnMessageReceived += async (peer, msg) => 
         {
+            if(msg.Sender.Equals(_myId)) return; 
+            if(peer.PeerRsa != null)
+            {
+                bool verified = _signer.VerifyData(msg.EncryptedContent, msg.Signature, peer.PublicKey);
+                if(!verified)
+                {
+                    Console.WriteLine($"Failed to validate signature for message: {msg.Id}"); 
+                    return; 
+                }
+            }
             if (msg.Type == MessageType.KeyExchange ) 
             {
                 peer.PublicKey = msg.PublicKey;
@@ -202,6 +228,7 @@ class Program
                     EncryptedContent = encryptedSessionKey, 
                     TargetPeerId = peer.Id
                 }; 
+                response.Signature = _signer.SignData(response.EncryptedContent); 
                 _messageQueue.EnqueueOutgoing(response);
             }
             else if (msg.Type == MessageType.SessionKey) 
@@ -262,6 +289,7 @@ class Program
                         {
                             msg.EncryptedContent = peer.Aes.Encrypt(msg.Content);  
                             msg.Content = ""; 
+                            msg.Signature = _signer.SignData(msg.EncryptedContent); 
                         }
                         _ = _client.SendAsync(msg.TargetPeerId, msg); 
                     }
@@ -274,6 +302,7 @@ class Program
                             {
                                 send.EncryptedContent = p.Aes.Encrypt(msg.Content);  
                                 send.Content = ""; 
+                                send.Signature = _signer.SignData(send.EncryptedContent); 
                             }
                             _ = _client.SendAsync(p.Id, send); 
                         }
@@ -288,6 +317,7 @@ class Program
                             {
                                 msg.EncryptedContent = peer.Aes.Encrypt(msg.Content);  
                                 msg.Content = ""; 
+                                msg.Signature = _signer.SignData(msg.EncryptedContent); 
                             }
                             _ = _server.SendAsync(msg.TargetPeerId, msg); 
                         }
@@ -295,12 +325,14 @@ class Program
                         {
                             foreach(Peer p in _server.GetConnectedPeers())
                             {
+                                if(p.Id.Equals(_myId)) continue; 
                                 Message send = new(msg); 
 
                                 if(msg.Type == MessageType.Text)
                                 {
                                     send.EncryptedContent = p.Aes.Encrypt(msg.Content);  
                                     send.Content = ""; 
+                                    send.Signature = _signer.SignData(send.EncryptedContent); 
                                 }
                                 _ = _server.SendAsync(p.Id, send); 
                             }
