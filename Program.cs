@@ -68,7 +68,7 @@ class Program
     // current peer id 
     private static string _myId = Guid.NewGuid().ToString();
     private static readonly Dictionary<string, HashSet<string>> _rooms = new ();
-    private static readonly object _roomLock = new object();
+    private static readonly object _roomsLock = new object();
     // Helper functions
     private static void RemovePeerFromAllRooms(string peerId)
     {
@@ -337,7 +337,6 @@ class Program
                     _consoleUI.ShowHelp(); 
                     break;
                 default:
-
                     var parsed_input = _consoleUI.ParseCommand(input);
                     if (!parsed_input.IsCommand) {
                         Message msg = new Message {
@@ -352,9 +351,9 @@ class Program
                     switch (parsed_input.CommandType)
                     {
                         case CommandType.Connect:
-                            
                             await _client!.ConnectAsync(parsed_input.Args[0], int.Parse(parsed_input.Args[1]));
                             break;
+
                         case CommandType.Listen:
                             if (!_server.IsListening) {
                                 try
@@ -369,21 +368,25 @@ class Program
                                 _consoleUI.DisplaySystem("Server is already listening");
                             }
                             break;
+                        
                         case CommandType.ListPeers:
                             foreach(var peer in _server.GetConnectedPeers())
                             {
                                 Console.WriteLine(peer); 
                             }
                             break;
+                        
                         case CommandType.History:
                             break;
+
                         case CommandType.Quit:
                             running = false;
                             break;
+
                         case CommandType.CreateRoom:
                             {
                                 string roomID = parsed_input.Args[0];
-                                lock(_roomLock)
+                                lock(_roomsLock)
                                 {
                                     if(!_rooms.ContainsKey(roomID))
                                     {
@@ -397,6 +400,7 @@ class Program
                                 }
                             break;
                             }
+
                         case CommandType.JoinRoom:
                             {
                                 string roomID = parsed_input.Args[0];
@@ -407,7 +411,7 @@ class Program
                                         _consoleUI.DisplaySystem($"Room {roomID} does not exist");
                                         break;
                                     }
-                                    if(_rooms[roomID].Add(peerID))
+                                    if(_rooms[roomID].Add(_myId))
                                     {
                                         _consoleUI.DisplaySystem($"Joined room {roomID}");
                                     }
@@ -418,6 +422,7 @@ class Program
                                 }
                             break;
                             }
+
                         case CommandType.LeaveRoom:
                             {
                                 string roomID = parsed_input.Args[0];
@@ -428,7 +433,7 @@ class Program
                                         _consoleUI.DisplaySystem($"Room {roomID} does not exist");
                                         break;
                                     }
-                                    if(_rooms[roomID].Remove(peerID))
+                                    if(_rooms[roomID].Remove(_myId))
                                     {
                                         _consoleUI.DisplaySystem($"Left room {roomID}");
                                     }
@@ -437,8 +442,9 @@ class Program
                                         _consoleUI.DisplaySystem($"Not in room {roomID}");
                                     }
                                 }
-                            }
                             break;
+                            }
+
                         case CommandType.ListRooms:
                             {
                                 lock(_roomsLock)
@@ -455,8 +461,8 @@ class Program
                                 }
                             }
                             break;
+
                         case CommandType.SendToRoom:
-                    
                             {
                                 string roomId = parsed_input.Args[0];
                                 string content = string.Join(" ", parsed_input.Args.Skip(1));
@@ -497,11 +503,8 @@ class Program
                                 }
                             }
                             break;
-                    }
                         case CommandType.Unknown:
                             Console.WriteLine($"\n{parsed_input.Message}. Please try again!\n");
-                            break;
-                        default:
                             break;
                     }
                     break;
@@ -526,3 +529,5 @@ class Program
         Console.WriteLine("Goodbye!");
     }
 }
+}
+
