@@ -16,7 +16,7 @@ public enum MessageType
     JoinRoomRequest,
 
     LeaveRoom,
-    JoinRoomResponse
+    GetRooms
     
 }
 /// <summary>

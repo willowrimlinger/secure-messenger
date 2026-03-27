@@ -25,6 +25,14 @@ class Rooms
         return output; 
     }
 
+    public HashSet<Peer> GetRoom(int room)
+    {
+        lock(_lock)
+        {
+            return _rooms[room]; 
+        }
+    }
+
     public bool CreateRoom(int room)
     {
         if(RoomExists(room)) return false; 

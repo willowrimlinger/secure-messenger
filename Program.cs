@@ -157,7 +157,7 @@ class Program
                     {
                         Sender = _myId, 
                         Type = MessageType.Text,  
-                        Content = $"Added to room {room}.",
+                        Content = $"[SERVER] Added to room {room}.",
                         TargetPeerId = peer.Id
                     }; 
                     _messageQueue.EnqueueOutgoing(response); 
@@ -168,7 +168,7 @@ class Program
                     {
                         Sender = _myId,
                         Type = MessageType.Text,
-                        Content = $"Failed to join room {room}.",
+                        Content = $"[SERVER] Failed to join room {room}.",
                         TargetPeerId = peer.Id 
                     };
                     _messageQueue.EnqueueOutgoing(response); 
@@ -182,11 +182,40 @@ class Program
                     {
                         Sender = _myId,
                         Type = MessageType.Text,
-                        Content = $"Created room {msg.RoomId}.",
+                        Content = $"[SERVER] Created room {msg.RoomId}.",
                         TargetPeerId = peer.Id 
                     };
                     _messageQueue.EnqueueOutgoing(response);
                 }
+            }
+            if(msg.Type == MessageType.LeaveRoom)
+            {
+                if(_rooms.RemovePeer(msg.RoomId, peer))
+                {
+                    Message response = new Message
+                    {
+                        Sender = _myId, 
+                        Type = MessageType.Text,
+                        Content = $"[SERVER] Left room {msg.RoomId}.",
+                        TargetPeerId = peer.Id  
+                    };
+                    _messageQueue.EnqueueOutgoing(response); 
+                }
+            }
+            if(msg.Type == MessageType.GetRooms)
+            {
+                Message response = new Message
+                {
+                    Sender = _myId, 
+                    Type = MessageType.Text,
+                    Content = "",
+                    TargetPeerId = peer.Id 
+                }; 
+                foreach(int room in _rooms.GetRooms())
+                {
+                    response.Content += room + ", "; 
+                }
+                _messageQueue.EnqueueOutgoing(response); 
             }
             
         };
@@ -320,6 +349,24 @@ class Program
                                 msg.Signature = _signer.SignData(msg.EncryptedContent); 
                             }
                             _ = _server.SendAsync(msg.TargetPeerId, msg); 
+                        }
+                        else if (msg.RoomId != -1)
+                        {
+                            if(_rooms.RoomExists(msg.RoomId)) 
+                            {
+                                foreach(Peer p in _rooms.GetRoom(msg.RoomId))
+                                {
+                                    Message send = new(msg);  
+
+                                    if(msg.Type == MessageType.Text)
+                                    {
+                                        send.EncryptedContent = p.Aes.Encrypt(msg.Content);  
+                                        send.Content = ""; 
+                                        send.Signature = _signer.SignData(send.EncryptedContent); 
+                                    }
+                                    _ = _server.SendAsync(p.Id, send); 
+                                }
+                            }
                         }
                         else
                         {
@@ -469,9 +516,21 @@ class Program
 
                         case CommandType.ListRooms:
                             {
-                                foreach(var room in _rooms.GetRooms())
+                                if(_server.IsListening) 
                                 {
-                                    Console.WriteLine(room); 
+                                    foreach(var room in _rooms.GetRooms())
+                                    {
+                                        Console.WriteLine(room); 
+                                    }
+                                }
+                                else
+                                {
+                                    Message msg = new Message
+                                    {
+                                        Sender = _myId,
+                                        Type = MessageType.GetRooms
+                                    };
+                                    _messageQueue.EnqueueOutgoing(msg); 
                                 }
                             }
                             break;
