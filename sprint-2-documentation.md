@@ -82,7 +82,9 @@ Each peer instance stores PublicKey, PrivateKey, AESKey and _myRsa everything el
 | 0x05 | PeerDiscovery | Announce presence to peers | 
 | 0x06 | CreateRoom | Create a new room | 
 | 0x07 | JoinRoomRequest | Request to join a room |
-
+| 0x08 | LeaveRoom | Leave a room | 
+| 0x09 | GetRooms | request a list of rooms |
+|||||
 
 ---
 
@@ -95,7 +97,7 @@ Each peer instance stores PublicKey, PrivateKey, AESKey and _myRsa everything el
 | Threat | Mitigation |
 |--------|------------|
 | Eavesdropping | AES encryption of all messages |
-| Man-in-the-middle | We havent done anything in specific to mitage the threat of a man in the middle attack |
+| Man-in-the-middle | We havent done anything in specific to mitage the threat of a man in the middle attack, due to the lack of the necessity/use of CAs |
 | Message tampering | Digital signatures |
 | Replay attacks |  |
 | | |
