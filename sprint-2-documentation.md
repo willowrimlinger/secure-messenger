@@ -8,7 +8,7 @@
 - Michael Reizenstein - [Role/Responsibilities]
 - Sean Gaines - [Role/Responsibilities]
 
-**Date: 3/27/26**
+**Date:** [3/27/26]
 
 ---
 
@@ -51,17 +51,17 @@
 ### Key Generation
 [Describe when and how keys are generated]
 
-- **RSA Key Pair:** [When generated, how stored]
-- **AES Session Key:** [When generated, lifetime]
+- **RSA Key Pair:** Generated once at program startup by each messenger instance using new RsaEncryption(). The public key is exported and shared in KeyExchange messages. The private key appears to remain only inside the running process.
+- **AES Session Key:** Generated after a peer’s public RSA key is learned, using AesEncryption.GenerateKey(). It is encrypted with the peer’s RSA public key, sent in a SessionKey message, and then used for message encryption/decryption with that peer.
 
 ### Key Storage
-[Describe how keys are stored during runtime]
+Each peer instance stores PublicKey, PrivateKey, AESKey and _myRsa everything else is in local variables.
 
 ### Key Lifetime
 | Key Type | Generated When | Expires When |
 |----------|----------------|--------------|
-| RSA Key Pair | | |
-| AES Session Key | | |
+| RSA Key Pair | At program startup | When the program ends |
+| AES Session Key | After a peer public key is recieved | When the peer disconnects |
 
 ---
 
@@ -70,17 +70,22 @@
 ### Message Format
 ```
 [Describe your message format, e.g.:]
-[4 bytes: length][1 byte: type][payload]
+[4 bytes: length][JSON serialized message object]
 ```
 
 ### Message Types
 | Type ID | Name | Description |
 |---------|------|-------------|
-| 0x01 | PUBLIC_KEY | RSA public key exchange |
-| 0x02 | SESSION_KEY | Encrypted AES session key |
-| 0x03 | MESSAGE | Encrypted chat message |
-| 0x04 | SIGNED_MESSAGE | Signed and encrypted message |
-| | | |
+| 0x01 | TEXT | General text |
+| 0x02 | KeyExchange | RSA public key |
+| 0x03 | SessionKey | AES Key | 
+| 0x04 | HeartBeat| connection health check |
+| 0x05 | PeerDiscovery | Announce presence to peers | 
+| 0x06 | CreateRoom | Create a new room | 
+| 0x07 | JoinRoomRequest | Request to join a room |
+| 0x08 | LeaveRoom | Leave a room | 
+| 0x09 | GetRooms | request a list of rooms |
+|||||
 
 ---
 
@@ -93,9 +98,9 @@
 | Threat | Mitigation |
 |--------|------------|
 | Eavesdropping | AES encryption of all messages |
-| Man-in-the-middle | [Your mitigation] |
+| Man-in-the-middle | We havent done anything in specific to mitage the threat of a man in the middle attack, due to the lack of the necessity/use of CAs |
 | Message tampering | Digital signatures |
-| Replay attacks | [Your mitigation, if any] |
+| Replay attacks |  |
 | | |
 
 ### Known Limitations
@@ -105,14 +110,14 @@
 
 ## Features Implemented
 
-- [ ] AES encryption of messages
-- [ ] RSA key pair generation
-- [ ] RSA key exchange
-- [ ] AES session key exchange (encrypted with RSA)
-- [ ] Message signing
-- [ ] Signature verification
-- [ ] Multiple simultaneous conversations
-- [ ] Per-conversation encryption keys
+- [x] AES encryption of messages
+- [x] RSA key pair generation
+- [x] RSA key exchange
+- [x] AES session key exchange (encrypted with RSA)
+- [x] Message signing
+- [x] Signature verification
+- [x] Multiple simultaneous conversations
+- [x] Per-conversation encryption keys
 
 ---
 
@@ -121,10 +126,10 @@
 ### Security Tests
 | Test | Expected Result | Actual Result | Pass/Fail |
 |------|-----------------|---------------|-----------|
-| Messages are encrypted on wire | Cannot read plaintext in network capture | | |
-| Key exchange completes | Both peers have shared session key | | |
-| Tampered message rejected | Signature verification fails | | |
-| Different keys per conversation | Each peer pair has unique keys | | |
+| Messages are encrypted on wire | Cannot read plaintext in network capture | | Pass |
+| Key exchange completes | Both peers have shared session key | | Pass |
+| Tampered message rejected | Signature verification fails | | Pass |
+| Different keys per conversation | Each peer pair has unique keys | | Pass |
 
 ---
 

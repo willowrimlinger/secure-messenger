@@ -19,6 +19,7 @@ public class Peer
     public int Port { get; set; }
     public DateTime LastSeen { get; set; } = DateTime.Now;
     public bool IsConnected { get; set; }
+    public int CurrentRoom { get; set; } = -1;
 
     // Network connection
     public TcpClient? Client { get; set; }

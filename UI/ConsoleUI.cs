@@ -61,7 +61,21 @@ public class ConsoleUI
         Console.WriteLine("  /peers                - List connected peers");
         Console.WriteLine("  /history              - View message history");
         Console.WriteLine("  /quit                 - Exit the application");
+        Console.WriteLine("  /create <# room>      - Create room");
+        Console.WriteLine("  /join <# room>        - Join a room");
+        Console.WriteLine("  /leave <# room>       - Leave a room");
+        Console.WriteLine("  /rooms                - List all rooms");
+        Console.WriteLine("  /msg <# room> <msg>   - Send a message to a room");
         Console.WriteLine();
+    }
+
+    public bool CheckArgs(string command, string[] args, string usage)  {
+        if(args.Length < 1)
+        {
+            Console.WriteLine($"Too few arguments for /{command}. Usage: /{command} [{usage}]"); 
+            return false;
+        }
+        return true;
     }
 
     /// <summary>
@@ -112,11 +126,7 @@ public class ConsoleUI
             case "/listen":
             {
                 var args = parts[1..].ToArray(); 
-                if(args.Length < 1)
-                {
-                    Console.WriteLine("Too few arguments for /listen. Usage: /listen [port]"); 
-                    break; 
-                }
+                if (!CheckArgs("listen", parts, "port")) break;
                 return new CommandResult 
                 {
                     IsCommand = true,
@@ -149,6 +159,64 @@ public class ConsoleUI
                     CommandType = CommandType.Quit
                 };
             }
+            case "/create":
+            {
+                var args = parts[1..].ToArray(); 
+                if (!CheckArgs("create", args, "#room")) break;
+                return new CommandResult
+                {
+                    IsCommand = true, 
+                    CommandType = CommandType.CreateRoom,
+                    Args = args
+                };
+            }
+            case "/join":
+            {
+                var args = parts[1..].ToArray(); 
+                if (!CheckArgs("join", args, "#room")) break;
+                return new CommandResult
+                {
+                    IsCommand = true, 
+                    CommandType = CommandType.JoinRoom,
+                    Args = args
+                };
+            }
+            case "/leave":
+            {
+                var args = parts[1..].ToArray(); 
+                if (!CheckArgs("leave", args, "#room")) break;
+                return new CommandResult
+                {
+                    IsCommand = true, 
+                    CommandType = CommandType.LeaveRoom,
+                    Args = args
+                };
+            }
+            case "/rooms":
+            {
+                var args = parts[1..].ToArray(); 
+                return new CommandResult
+                {
+                    IsCommand = true, 
+                    CommandType = CommandType.ListRooms,
+                    Args = args
+                };
+            }
+            case "/msg":
+            {
+                var args = parts[1..].ToArray(); 
+                if(args.Length < 2)
+                {
+                    Console.WriteLine("Too few arguments for /msg. Usage: /msg [#room] [message]"); 
+                    break; 
+                }
+                return new CommandResult
+                {
+                    IsCommand = true, 
+                    CommandType = CommandType.SendToRoom,
+                    Args = args
+                };
+            }
             default:
                 return new CommandResult
                 {
@@ -176,7 +244,12 @@ public enum CommandType
     Listen,
     ListPeers,
     History,
-    Quit
+    Quit,
+    CreateRoom,
+    JoinRoom,
+    LeaveRoom,
+    ListRooms,
+    SendToRoom
 }
 
 /// <summary>
