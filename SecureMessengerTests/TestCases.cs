@@ -1,269 +1,434 @@
-using SecureMessenger.Network;
+using System;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Xunit;
-using System.Text;
 using SecureMessenger.Core;
+using SecureMessenger.Network;
 using SecureMessenger.Security;
-using System.Runtime.Intrinsics.Arm;
+using Xunit;
 
 namespace SecureMessenger.Tests;
 
-// public class ConnectionTests
-// {
-//     [Fact]
-//     /// Test Case: Two instances can connect to each other
-//     public async Task TwoInstancesCanConnect()
-//     {
-//         /// Get anyfree TCP port to avoid conflicts with other tests or applications
-//         int port = TestHelpers.GetFreeTcpPort();
-//         /// Create a server and a client instance
-//         var server = new TcpServer();
-//         /// Avoid null reference exceptions
-//         server.OnPeerConnected += _ => { };
-//         server.OnMessageReceived += (_, __) => { };
-//         var client = new TcpClientHandler();
-//         /// Create events to wait for connection notifications
-//         var serverConnected = new ManualResetEventSlim(false);
+public class TestCasesSprint2
+{
+    [Fact]
+    public async Task MessagesAreEncryptedOnWire()
+    {
+        // We set up a TCP server and client, perform a simple key exchange to establish a shared AES key, and then send an encrypted message from the client to the server. 
+        // The test checks that the server receives the encrypted message, that the plaintext is not present in the serialized message, and that the server can successfully 
+        // decrypt the message to retrieve the original plaintext.
+        
+        // Set up
+        int port = GetFreeTcpPort();
+        var server = new TcpServer();
+        var client = new TcpClientHandler();
+        server.OnPeerConnected += _ => { };
+        server.OnMessageReceived += (_, __) => { };
+        string? clientPeerId = null;
+        Peer? serverPeer = null;
+        Message? received = null;
+        var receivedEvent = new ManualResetEventSlim(false);
 
-//         server.OnPeerConnected += _ => serverConnected.Set();
-//         var clientConnected = new ManualResetEventSlim(false);
-//         server.OnPeerConnected += _ => serverConnected.Set();
-//         client.OnConnected += _ => clientConnected.Set();
-//         /// Starting Server
-//         server.Start(port);
-//         /// Connect client to server and then check to see if it was successful
-//         bool ok = await client.ConnectAsync("127.0.0.1", port);
-//         Assert.True(ok);
-//         /// Wait for both sides to report the connection
-//         Assert.True(TestHelpers.Wait(clientConnected), "Client did not report connection.");
-//         Assert.True(TestHelpers.Wait(serverConnected), "Server did not report incoming connection.");
-//         /// Clean up
-//         client.DisconnectAll();
-//         server.Stop();
-//     }
-// }
+        // Set up event handlers to capture the client peer ID, server peer, and received message
+        client.OnConnected += peer => clientPeerId = peer.Id;
+        server.OnPeerConnected += peer => serverPeer = peer;
+        server.OnMessageReceived += (_, msg) =>
+        {
+            received = msg;
+            receivedEvent.Set();
+        };
+        try
+        {
+            // Start the server and connect the client
+            server.Start(port);
+            // Perform a simple key exchange to establish a shared AES key
+            Assert.True(await client.ConnectAsync("127.0.0.1", port));
+            Assert.True(SpinWait.SpinUntil(() => clientPeerId != null && serverPeer != null, 3000));
+            // Generate a shared AES key and assign it to both the client and server peers
+            byte[] sharedKey = AesEncryption.GenerateKey();
+            var clientAes = new AesEncryption(sharedKey);
+            serverPeer!.AesKey = sharedKey;
+            serverPeer.Aes = new AesEncryption(sharedKey);
+            // Encrypt a plaintext message using the client's AES instance and send it to the server
+            const string plaintext = "Sprint 2 secret over TCP";
+            byte[] ciphertext = clientAes.Encrypt(plaintext);
+            // Create a message with the encrypted content and send it to the server
+            var outgoing = new Message
+            {
+                Sender = "client-a",
+                Type = MessageType.Text,
+                Content = string.Empty,
+                EncryptedContent = ciphertext
+            };
+            // Send the message to the server
+            await client.SendAsync(clientPeerId!, outgoing);
+            // Wait for the server to receive the message and verify that it is encrypted on the wire
+            Assert.True(Wait(receivedEvent), "Server did not receive the encrypted message.");
+            Assert.NotNull(received);
+            Assert.Equal(string.Empty, received!.Content);
+            Assert.NotNull(received.EncryptedContent);
+            // Verify that the plaintext is not present in the serialized message
+            string serialized = Encoding.UTF8.GetString(outgoing.ToByteArray(), 4, outgoing.ToByteArray().Length - 4);
+            Assert.DoesNotContain(plaintext, serialized);
+            // Verify that the server can successfully decrypt the message to retrieve the original plaintext
+            string decrypted = Encoding.UTF8.GetString(serverPeer.Aes!.Decrypt(received.EncryptedContent!));
+            Assert.Equal(plaintext, decrypted);
+        }
+        finally
+        {
+            DisconnectAll(client);
+            server.Stop();
+        }
+    }
 
-// public class MessagingTests
-// {
-//     [Fact]
-//     /// Test Case: Messages sent by one instance are received by the other
-//     public async Task MessagesSentAndReceived()
-//     {
-//         /// Get anyfree TCP port to avoid conflicts with other tests or applications
-//         int port = TestHelpers.GetFreeTcpPort();
-//         /// Create a server and two client instances
-//         var server = new TcpServer();
-//         /// Avoid null reference exceptions
-//         server.OnPeerConnected += _ => { };
-//         server.OnMessageReceived += (_, __) => { };
-//         server.OnMessageReceived += async (peer, msg) => await server.BroadcastAsync(msg);
-//         var sender = new TcpClientHandler();
-//         var receiver = new TcpClientHandler();
-//         /// Variables to track the sender's peer ID and the content received by the receiver
-//         string? senderPeerId = null;
-//         string? receivedContent = null;
-//         /// Create an event to wait for the receiver to get the message
-//         var receiverGotMessage = new ManualResetEventSlim(false);
-//         // When server receives a message, broadcast it to everyone except the sender
-//         server.OnMessageReceived += async (peer, msg) => await server.BroadcastAsync(msg);
-//         /// When sender connects, save its peer ID for later use
-//         sender.OnConnected += peer => senderPeerId = peer.Id;
-//         /// When receiver gets a message, save the content and signal that we got it
-//         receiver.OnMessageReceived += (_, msg) =>
-//         {
-//             receivedContent = Encoding.UTF8.GetString(msg.Content);
-//             receiverGotMessage.Set();
-//         };
-//         /// Start the server and connect both sender and receiver to it
-//         server.Start(port);
-//         Assert.True(await sender.ConnectAsync("127.0.0.1", port));
-//         Assert.True(await receiver.ConnectAsync("127.0.0.1", port));
-//         /// Wait for the sender to report its connection and get its peer ID
-//         SpinWait.SpinUntil(() => senderPeerId != null, 3000);
-//         Assert.NotNull(senderPeerId);
-//         /// Send a message from the sender to the server, which will broadcast it to the receiver
-//         var outgoing = new Message
-//         {
-//             Id = Guid.NewGuid(),
-//             Sender = "test",
-//             Content = Encoding.UTF8.GetBytes("hello world"),
-//             Timestamp = DateTime.Now
-//         };
-//         await sender.SendAsync(senderPeerId!, outgoing);
-//         /// Wait for the receiver to get the message and then check that the content is correct
-//         Assert.True(TestHelpers.Wait(receiverGotMessage), "Receiver never got the broadcast message.");
-//         Assert.Equal("hello world", receivedContent);
-//         /// Clean up
-//         sender.DisconnectAll();
-//         receiver.DisconnectAll();
-//         server.Stop();
-//     }
-// }
+    [Fact]
+    public async Task KeyExchangeCompletes()
+    {   
+        // set up
+        int port = GetFreeTcpPort();
+        var server = new TcpServer();
+        var client = new TcpClientHandler();
+        var serverRsa = new RsaEncryption();
+        byte[] serverPublicKey = serverRsa.ExportPublicKey();
+        var clientRsa = new RsaEncryption();
+        var clientSigner = new MessageSigner(clientRsa.GetRSA());
+        string? serverPeerId = null;
+        string? clientPeerId = null;
+        byte[]? serverSessionKey = null;
+        byte[]? clientSessionKey = null;
+        var handshakeDone = new ManualResetEventSlim(false);
 
-// public class DisconnectTests
-// {
-//     [Fact]
-//     /// Test Case: Disconnections are handled properly by both sides
-//     public async Task DisconnectionHandled()
-//     {
-//         /// Get anyfree TCP port to avoid conflicts with other tests or applications
-//         int port = TestHelpers.GetFreeTcpPort();
-//         /// Create a server and a client instance
-//         var server = new TcpServer();
-//         /// Avoid null reference exceptions
-//         server.OnPeerConnected += _ => { };
-//         server.OnMessageReceived += (_, __) => { };
-//         var client = new TcpClientHandler();
-//         /// Variable to track the client's peer ID
-//         string? clientPeerId = null;
-//         /// Create events to wait for disconnection notifications
-//         var serverSawDisconnect = new ManualResetEventSlim(false);
-//         var clientSawDisconnect = new ManualResetEventSlim(false);
-//         /// When client connects, save its peer ID for later use
-//         client.OnConnected += peer => clientPeerId = peer.Id;
-//         client.OnDisconnected += _ => clientSawDisconnect.Set();
-//         server.OnPeerDisconnected += _ => serverSawDisconnect.Set();
-//         /// Start the server and connect the client to it
-//         server.Start(port);
-//         try{
-//             /// Wait for the client to report its connection and get its peer ID
-//             Assert.True(await client.ConnectAsync("127.0.0.1", port));
-//             SpinWait.SpinUntil(() => clientPeerId != null, 3000);
-//             Assert.NotNull(clientPeerId);
-//             /// Disconnect the client and then check that both sides reported the disconnection
-//             client.Disconnect(clientPeerId!);
-//             /// Wait for both sides to report the disconnection
-//             Assert.True(TestHelpers.Wait(clientSawDisconnect), "Client did not raise OnDisconnected.");
-//             Assert.True(TestHelpers.Wait(serverSawDisconnect), "Server did not raise OnPeerDisconnected.");
-//         }
-//         finally
-//         {
-//             client.DisconnectAll();
-//             server.Stop();
-//         }
-//     }
-// }
+        server.OnPeerConnected += peer =>
+        {
+            serverPeerId = peer.Id;
 
-// public class LoadTests
-// {
-//     [Fact]
-//     public async Task ServerHandlesTwentyClientsConnectingAndBroadcast()
-//     {
-//         /// Get anyfree TCP port to avoid conflicts with other tests or applications
-//         int port = TestHelpers.GetFreeTcpPort();
-//         /// Create a server instance
-//         var server = new TcpServer();
-//         server.OnMessageReceived += (_, __) => { };
-//         /// Track how many clients have connected to the server
-//         int connectedCount = 0;
-//         var allConnected = new ManualResetEventSlim(false);
-//         /// When a client connects, increment the count and if we reach 20, signal that all are connected
-//         server.OnPeerConnected += _ =>
-//         {
-//             if (Interlocked.Increment(ref connectedCount) == 20)
-//                 allConnected.Set();
-//         };
+            var keyExchange = new Message
+            {
+                Sender = "server",
+                Type = MessageType.KeyExchange,
+                PublicKey = serverPublicKey,
+                TargetPeerId = peer.Id
+            };
 
-//         /// When server receives any message, broadcast it to everyone.
-//         server.OnMessageReceived += async (_, msg) => await server.BroadcastAsync(msg);
-//         /// Start the server
-//         server.Start(port);
-//         /// Create 20 clients and connect them to the server,
-//         /// setting up events to track their connections and message receptions
-//         var clients = new List<TcpClientHandler>();
-//         var clientConnected = new ManualResetEventSlim[20];
-//         var clientGotBroadcast = new ManualResetEventSlim[20];
+            server.SendAsync(peer.Id, keyExchange).GetAwaiter().GetResult();
+        };
 
-//         /// Store peer ids so we can send from each client (if needed)
-//         var peerIds = new string?[20];
+        server.OnMessageReceived += (peer, msg) =>
+        {
+            if (msg.Type == MessageType.SessionKey)
+            {
+                byte[] key = serverRsa.DecryptSessionKey(msg.EncryptedContent!);
+                peer.AesKey = key;
+                peer.Aes = new AesEncryption(key);
+                serverSessionKey = key;
 
-//         /// Track how many clients received the broadcast
-//         int receivedCount = 0;
-//         /// Set up each client to connect and listen for messages, 
-//         /// incrementing the received count when they get the broadcast message
-//         try
-//         {
-//             for (int i = 0; i < 20; i++)
-//             {
-//                 var client = new TcpClientHandler();
-//                 clients.Add(client);
+                if (clientSessionKey != null)
+                    handshakeDone.Set();
+            }
+        };
 
-//                 clientConnected[i] = new ManualResetEventSlim(false);
-//                 clientGotBroadcast[i] = new ManualResetEventSlim(false);
+        client.OnConnected += peer => clientPeerId = peer.Id;
 
-//                 int idx = i;
+        client.OnMessageReceived += (peer, msg) =>
+        {
+            if (msg.Type == MessageType.KeyExchange)
+            {
+                peer.PublicKey = msg.PublicKey;
+                peer.PeerRsa = new RsaEncryption();
+                peer.PeerRsa.ImportPublicKey(peer.PublicKey);
 
-//                 client.OnConnected += peer =>
-//                 {
-//                     peerIds[idx] = peer.Id;
-//                     clientConnected[idx].Set();
-//                 };
+                peer.AesKey = AesEncryption.GenerateKey();
+                peer.Aes = new AesEncryption(peer.AesKey);
+                clientSessionKey = peer.AesKey;
 
-//                 client.OnMessageReceived += (_, msg) =>
-//                 {
-//                     if (Encoding.UTF8.GetString(msg.Content) == "load-test")
-//                     {
-//                         Interlocked.Increment(ref receivedCount);
-//                         clientGotBroadcast[idx].Set();
-//                     }
-//                 };
-//             }
+                byte[] encryptedSessionKey = peer.PeerRsa.EncryptSessionKey(peer.AesKey, peer.PublicKey);
+                var response = new Message
+                {
+                    Sender = "client",
+                    Type = MessageType.SessionKey,
+                    EncryptedContent = encryptedSessionKey,
+                    Signature = clientSigner.SignData(encryptedSessionKey)
+                };
 
-//             /// Connect all clients concurrently
-//             var connectTasks = clients.Select(c => c.ConnectAsync("127.0.0.1", port)).ToArray();
-//             bool[] results = await Task.WhenAll(connectTasks);
-//             Assert.All(results, Assert.True);
+                client.SendAsync(peer.Id, response).GetAwaiter().GetResult();
 
-//             /// Wait until each client reports connected
-//             for (int i = 0; i < 20; i++)
-//                 Assert.True(TestHelpers.Wait(clientConnected[i]), $"Client {i} did not report connection.");
+                if (serverSessionKey != null)
+                    handshakeDone.Set();
+            }
+        };
 
-//             /// Wait until server reports all 20 connections
-//             Assert.True(TestHelpers.Wait(allConnected), "Server did not observe 20 client connections.");
+        try
+        {
+            // Start the server and connect the client to initiate the handshake
+            server.Start(port);
+            Assert.True(await client.ConnectAsync("127.0.0.1", port));
+            Assert.True(SpinWait.SpinUntil(() => serverPeerId != null && clientPeerId != null, 3000));
+            Assert.True(Wait(handshakeDone), "Session key exchange did not complete.");
+            // Verify that both the client and server have derived the same session key
+            Assert.NotNull(serverSessionKey);
+            Assert.NotNull(clientSessionKey);
+            Assert.Equal(
+                Convert.ToBase64String(clientSessionKey!),
+                Convert.ToBase64String(serverSessionKey!));
+            // Verify that the server has an AES instance initialized with the derived session key
+            Peer? serverPeer = server.GetPeer(serverPeerId!);
+            Assert.NotNull(serverPeer);
+            Assert.NotNull(serverPeer!.Aes);
+            // Verify that the client can encrypt a message with the session key and the server can decrypt it successfully
+            const string plaintext = "handshake-complete";
+            byte[] ciphertext = serverPeer.Aes!.Encrypt(plaintext);
+            string decrypted = Encoding.UTF8.GetString(new AesEncryption(clientSessionKey!).Decrypt(ciphertext));
+            Assert.Equal(plaintext, decrypted);
+        }
+        finally
+        {
+            DisconnectAll(client);
+            server.Stop();
+        }
+    }
 
-//             /// Send one message from client 0 and expect broadcast to others
-//             var msgToSend = new Message
-//             {
-//                 Id = Guid.NewGuid(),
-//                 Sender = "load-test-sender",
-//                 Content = Encoding.UTF8.GetBytes("load-test"),
-//                 Timestamp = DateTime.Now
-//             };
+    [Fact]
+    public async Task TamperedMessageRejected()
+    {
+        // setup
+        int port = GetFreeTcpPort();
+        var server = new TcpServer();
+        var client = new TcpClientHandler();
+        var serverRsa = new RsaEncryption();
+        byte[] serverPublicKey = serverRsa.ExportPublicKey();
+        var clientRsa = new RsaEncryption();
+        byte[] clientPublicKey = clientRsa.ExportPublicKey();
+        var clientSigner = new MessageSigner(clientRsa.GetRSA());
+        var verifier = new MessageSigner(serverRsa.GetRSA());
+        byte[]? sharedSessionKey = null;
+        var handshakeDone = new ManualResetEventSlim(false);
+        var tamperedRejected = new ManualResetEventSlim(false);
+        var tamperedAccepted = new ManualResetEventSlim(false);
 
-//             Assert.NotNull(peerIds[0]);
-//             await clients[0].SendAsync(peerIds[0]!, msgToSend);
+        server.OnPeerConnected += peer =>
+        {
+            var serverHello = new Message
+            {
+                Sender = "server",
+                Type = MessageType.KeyExchange,
+                PublicKey = serverPublicKey,
+                TargetPeerId = peer.Id
+            };
+            server.SendAsync(peer.Id, serverHello).GetAwaiter().GetResult();
+        };
 
-//             /// Wait for broadcasts; allow a little slack if your server excludes sender, etc.
-//             /// Expect at least 19 receivers if sender doesn't receive its own broadcast.
-//             var sw = System.Diagnostics.Stopwatch.StartNew();
-//             while (sw.ElapsedMilliseconds < 4000 && Volatile.Read(ref receivedCount) < 19)
-//                 Thread.Sleep(10);
+        server.OnMessageReceived += (peer, msg) =>
+        {
+            if (msg.Type == MessageType.KeyExchange)
+            {
+                peer.PublicKey = msg.PublicKey;
+                peer.PeerRsa = new RsaEncryption();
+                peer.PeerRsa.ImportPublicKey(peer.PublicKey);
+                return;
+            }
 
-//             Assert.True(receivedCount >= 19, $"Expected >= 19 clients to receive broadcast, got {receivedCount}.");
-//         }
-//         /// Clean up
-//         finally
-//         {
-//             foreach (var c in clients)
-//                 c.DisconnectAll();
+            if (msg.Type == MessageType.SessionKey)
+            {
+                byte[] key = serverRsa.DecryptSessionKey(msg.EncryptedContent!);
+                peer.AesKey = key;
+                peer.Aes = new AesEncryption(key);
+                sharedSessionKey = key;
+                handshakeDone.Set();
+                return;
+            }
 
-//             server.Stop();
-//         }
-//     }
-// }
+            if (msg.Type == MessageType.Text)
+            {
+                bool verified = verifier.VerifyData(msg.EncryptedContent!, msg.Signature!, peer.PublicKey!);
+                if (!verified)
+                {
+                    tamperedRejected.Set();
+                    return;
+                }
 
-// public class AesTest
-// {
-//     [Fact]
-//     public async Task EncryptAndDecryptText()
-//     {
-//         byte[] key = AesEncryption.GenerateKey(); 
-//         AesEncryption aesEncryption = new AesEncryption(key); 
-//         string message = "What can the harvest hope for, if not the care of the Reaper Man?";
-//         byte[] ciphertext = aesEncryption.Encrypt(message); 
-//         // string plaintext = aesEncryption.Decrypt(ciphertext); 
-//         string plaintext = Encoding.UTF8.GetString(aesEncryption.Decrypt(ciphertext));
-//         Assert.Equal(message, plaintext);
-//     }
-// }
+                tamperedAccepted.Set();
+            }
+        };
+
+        client.OnMessageReceived += (peer, msg) =>
+        {
+            if (msg.Type != MessageType.KeyExchange)
+                return;
+
+            peer.PublicKey = msg.PublicKey;
+            peer.PeerRsa = new RsaEncryption();
+            peer.PeerRsa.ImportPublicKey(peer.PublicKey);
+
+            var clientHello = new Message
+            {
+                Sender = "client",
+                Type = MessageType.KeyExchange,
+                PublicKey = clientPublicKey
+            };
+            client.SendAsync(peer.Id, clientHello).GetAwaiter().GetResult();
+
+            peer.AesKey = AesEncryption.GenerateKey();
+            peer.Aes = new AesEncryption(peer.AesKey);
+
+            byte[] encryptedSessionKey = peer.PeerRsa.EncryptSessionKey(peer.AesKey, peer.PublicKey);
+            var sessionKeyMessage = new Message
+            {
+                Sender = "client",
+                Type = MessageType.SessionKey,
+                EncryptedContent = encryptedSessionKey,
+                Signature = clientSigner.SignData(encryptedSessionKey)
+            };
+
+            client.SendAsync(peer.Id, sessionKeyMessage).GetAwaiter().GetResult();
+        };
+
+        try
+        {
+            // Start the server and connect the client to perform the handshake
+            server.Start(port);
+            Assert.True(await client.ConnectAsync("127.0.0.1", port));
+            Assert.True(Wait(handshakeDone), "Handshake never completed.");
+            // Create a valid encrypted message and then tamper with the ciphertext to simulate
+            byte[] ciphertext = new AesEncryption(sharedSessionKey!).Encrypt("do not trust this");
+            byte[] signature = clientSigner.SignData(ciphertext);
+            // Tamper with the ciphertext by flipping a bit
+            byte[] tamperedCiphertext = (byte[])ciphertext.Clone();
+            tamperedCiphertext[tamperedCiphertext.Length - 1] ^= 0x01;
+            // Create a message with the tampered ciphertext and send it to the server
+            var tamperedMessage = new Message
+            {
+                Sender = "client",
+                Type = MessageType.Text,
+                Content = string.Empty,
+                EncryptedContent = tamperedCiphertext,
+                Signature = signature
+            };
+            // Send the tampered message to the server
+            Peer? clientPeer = client.GetConnectedPeers().FirstOrDefault();
+            Assert.NotNull(clientPeer);
+    
+            await client.SendAsync(clientPeer!.Id, tamperedMessage);
+            // Wait for the server to process the message and verify that it was rejected due to failed signature verification
+            Assert.True(Wait(tamperedRejected), "Tampered message was not rejected.");
+            Assert.False(tamperedAccepted.IsSet, "Tampered message was accepted.");
+        }
+        finally
+        {
+            DisconnectAll(client);
+            server.Stop();
+        }
+    }
+
+    [Fact]
+    public async Task DifferentKeysPerConversation()
+    {
+        byte[] first = await CompleteHandshakeAndReturnKey();
+        byte[] second = await CompleteHandshakeAndReturnKey();
+
+        Assert.NotEqual(
+            Convert.ToBase64String(first),
+            Convert.ToBase64String(second));
+    }
+
+    private static async Task<byte[]> CompleteHandshakeAndReturnKey()
+    {
+        // Set up
+        int port = GetFreeTcpPort();
+        var server = new TcpServer();
+        var client = new TcpClientHandler();
+        var serverRsa = new RsaEncryption();
+        byte[] serverPublicKey = serverRsa.ExportPublicKey();
+        byte[]? sessionKey = null;
+        var handshakeDone = new ManualResetEventSlim(false);
+
+        server.OnPeerConnected += peer =>
+        {
+            var keyExchange = new Message
+            {
+                Sender = "server",
+                Type = MessageType.KeyExchange,
+                PublicKey = serverPublicKey,
+                TargetPeerId = peer.Id
+            };
+
+            server.SendAsync(peer.Id, keyExchange).GetAwaiter().GetResult();
+        };
+
+        server.OnMessageReceived += (peer, msg) =>
+        {
+            if (msg.Type != MessageType.SessionKey)
+                return;
+
+            sessionKey = serverRsa.DecryptSessionKey(msg.EncryptedContent!);
+            peer.AesKey = sessionKey;
+            peer.Aes = new AesEncryption(sessionKey);
+            handshakeDone.Set();
+        };
+
+        client.OnMessageReceived += (peer, msg) =>
+        {
+            if (msg.Type != MessageType.KeyExchange)
+                return;
+
+            peer.PublicKey = msg.PublicKey;
+            peer.PeerRsa = new RsaEncryption();
+            peer.PeerRsa.ImportPublicKey(peer.PublicKey);
+
+            peer.AesKey = AesEncryption.GenerateKey();
+            peer.Aes = new AesEncryption(peer.AesKey);
+
+            byte[] encryptedSessionKey = peer.PeerRsa.EncryptSessionKey(peer.AesKey, peer.PublicKey);
+            var response = new Message
+            {
+                Sender = "client",
+                Type = MessageType.SessionKey,
+                EncryptedContent = encryptedSessionKey
+            };
+
+            client.SendAsync(peer.Id, response).GetAwaiter().GetResult();
+        };
+
+        try
+        {
+            // Start the server and connect the client to initiate the handshake
+            server.Start(port);
+            // Perform the handshake and wait for it to complete
+            Assert.True(await client.ConnectAsync("127.0.0.1", port));
+            // Wait for the handshake to complete and verify that a session key was established
+            Assert.True(Wait(handshakeDone), "Handshake never completed.");
+            // Verify that a session key was established and is not null
+            Assert.NotNull(sessionKey);
+            return sessionKey!;
+        }
+        finally
+        {
+            DisconnectAll(client);
+            server.Stop();
+        }
+    }
+    // Helper methods
+    private static bool Wait(ManualResetEventSlim evt, int timeoutMs = 5000)
+    {
+        return evt.Wait(timeoutMs);
+    }
+
+    private static int GetFreeTcpPort()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+
+    private static void DisconnectAll(TcpClientHandler client)
+    {
+        foreach (var peer in client.GetConnectedPeers().ToList())
+        {
+            client.Disconnect(peer.Id);
+        }
+    }
+}

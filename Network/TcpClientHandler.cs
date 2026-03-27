@@ -268,12 +268,16 @@ public class TcpClientHandler
     /// </summary>
     public void DisconnectAll()
     {
-        lock (_lock)
-        {
-            foreach (var peer in _connections.Keys) {
-                Disconnect(peer);
-            }
-        }
+    List<string> peerIds;
+    lock (_lock)
+    {
+        peerIds = _connections.Keys.ToList();
+    }
+
+    foreach (var peerId in peerIds)
+    {
+        Disconnect(peerId);
+    }
     }
 
     public Peer? GetPeer(string peerId)

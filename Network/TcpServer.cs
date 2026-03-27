@@ -318,24 +318,38 @@ public class TcpServer
     /// </summary>
     private void DisconnectPeer(string peerId)
     {
-        Peer? peer; 
-        lock (_connectedPeersLock)
+    Peer? peer = null;
+
+    lock (_connectedPeersLock)
+    {
+        if (_connectedPeers.TryGetValue(peerId, out peer))
         {
-            _connectedPeers.TryGetValue(peerId, out peer); 
+            _connectedPeers.Remove(peerId);
         }
-        peer.IsConnected = false;
-        if (peer.Client is not null) {
-            peer.Client.Dispose();
-        }
-        if (peer.Stream is not null) {
-            peer.Stream.Dispose();
-        }
-        lock (this._connectedPeersLock) {
-            this._connectedPeers.Remove(peerId);
-        }
-        if (this.OnPeerDisconnected is not null) {
-            this.OnPeerDisconnected(peer);
-        }
+    }
+
+    if (peer == null)
+        return;
+
+    peer.IsConnected = false;
+
+    try
+    {
+        peer.Stream?.Dispose();
+    }
+    catch
+    {
+    }
+
+    try
+    {
+        peer.Client?.Dispose();
+    }
+    catch
+    {
+    }
+
+    OnPeerDisconnected?.Invoke(peer);
     }
 
     /// <summary>
@@ -349,19 +363,33 @@ public class TcpServer
     /// </summary>
     public void Stop()
     {
-        if (this._cancellationTokenSource is not null) {
-            this._cancellationTokenSource.Cancel();
-        }
-        if (this._listener is not null) {
-            this._listener.Stop();
-        }
-        this.IsListening = false;
-        lock (this._connectedPeersLock) {
-            this._connectedPeers.Clear();
-        }
-        if (this._listenThread is not null) {
-            this._listenThread.Join();
-        }
+    _cancellationTokenSource?.Cancel();
+
+    try
+    {
+        _listener?.Stop();
+    }
+    catch
+    {
+    }
+
+    IsListening = false;
+
+    List<string> peerIds;
+    lock (_connectedPeersLock)
+    {
+        peerIds = _connectedPeers.Keys.ToList();
+    }
+
+    foreach (var peerId in peerIds)
+    {
+        DisconnectPeer(peerId);
+    }
+
+    if (_listenThread != null && _listenThread.IsAlive)
+    {
+        _listenThread.Join();
+    }
     }
 
     /// <summary>

@@ -125,10 +125,10 @@ Each peer instance stores PublicKey, PrivateKey, AESKey and _myRsa everything el
 ### Security Tests
 | Test | Expected Result | Actual Result | Pass/Fail |
 |------|-----------------|---------------|-----------|
-| Messages are encrypted on wire | Cannot read plaintext in network capture | | |
-| Key exchange completes | Both peers have shared session key | | |
-| Tampered message rejected | Signature verification fails | | |
-| Different keys per conversation | Each peer pair has unique keys | | |
+| Messages are encrypted on wire | Cannot read plaintext in network capture | | Pass |
+| Key exchange completes | Both peers have shared session key | | Pass |
+| Tampered message rejected | Signature verification fails | | Pass |
+| Different keys per conversation | Each peer pair has unique keys | | Pass |
 
 ---
 
