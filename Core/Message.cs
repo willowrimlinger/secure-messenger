@@ -12,15 +12,12 @@ public enum MessageType
     SessionKey,     // Sprint 2: Encrypted session key
     Heartbeat,      // Sprint 3: Connection health check
     PeerDiscovery,   // Sprint 3: Peer announcement
+    CreateRoom,
     JoinRoomRequest,
+
+    LeaveRoom,
     JoinRoomResponse
     
-}
-public class RoomPeerInfo
-{
-    public string PeerId { get; set; } = string.Empty;
-    public string Host { get; set; } = string.Empty;
-    public int Port { get; set; }
 }
 /// <summary>
 /// Represents a message in the system
@@ -43,10 +40,7 @@ public class Message
     public byte[]? Signature { get; set; }
     public byte[]? EncryptedContent { get; set; }
     public byte[]? PublicKey { get; set; }
-    public string? RoomId { get; set; }
-    public List<RoomPeerInfo>? RoomPeers { get; set; }
-    public string? Host{get; set;}
-    public int Port { get; set; }
+    public int RoomId { get; set; } = -1; 
 
     // Sprint 3: Target peer for directed messages
     public string? TargetPeerId { get; set; }
@@ -73,18 +67,6 @@ public class Message
         EncryptedContent = o.EncryptedContent; 
         PublicKey = o.PublicKey; 
         RoomId = o.RoomId;
-        RoomPeers = o.RoomPeers;
-        Host = o.Host;
-        Port = o.Port;
-        TargetPeerId = o.TargetPeerId; 
-        RoomPeers = o.RoomPeers == null 
-            ? null 
-            : new List<RoomPeerInfo>(
-                o.RoomPeers.Select(p => new RoomPeerInfo 
-                { 
-                    PeerId = p.PeerId, Host = p.Host, Port = p.Port 
-                    }));
-
     }
 
     /// <summary> 

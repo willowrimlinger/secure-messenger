@@ -64,53 +64,11 @@ class Program
     private static ConsoleUI? _consoleUI;
     private static CancellationTokenSource? _cancellationTokenSource;
     private static RsaEncryption? _myRsa;
-    private static byte[] _myPublicKey;
+    private static byte[]? _myPublicKey;
     // current peer id 
     private static string _myId = Guid.NewGuid().ToString();
-    private static int _myListeningPort;
-    private static string _myHost = "127.0.0.1";
-    private static readonly Dictionary<string, List<RoomPeerInfo>> _rooms = new ();
-    private static readonly object _roomsLock = new object();
-    // Helper Functions
-    private static RoomPeerInfo? GetRoomMemberByPeerId(string roomId, string peerId)
-    {
-        if (!_rooms.ContainsKey(roomId))
-            return null;
-
-        return _rooms[roomId].FirstOrDefault(m => m.PeerId == peerId);
-    }
-    private static bool IsSelfInRoom(string roomId)
-    {
-        if (!_rooms.ContainsKey(roomId))
-            return false;
-
-        return _rooms[roomId].Any(m => m.PeerId == _myId);
-    }
-    private static void RemovePeerFromAllRooms(string peerId)
-    {
-        lock (_roomsLock)
-        {
-            var emptyRooms = new List<string>();
-
-            foreach (var room in _rooms)
-            {
-                room.Value.RemoveAll(member => member.PeerId == peerId);
-                if (room.Value.Count == 0)
-                    emptyRooms.Add(room.Key);
-            }
-
-            foreach (string roomId in emptyRooms)
-                _rooms.Remove(roomId);
-        }
-    }
-
-    private static Peer? FindPeerById(string peerId)
-    {
-        Peer? peer = _client?.GetPeer(peerId);
-        if (peer != null) return peer;
-
-        return _server?.GetPeer(peerId);
-    }
+    private static Rooms _rooms = new(); 
+    private static readonly object _roomsLock = new();
 
     static async Task Main(string[] args)
     {
@@ -176,61 +134,48 @@ class Program
             }
             if(msg.Type == MessageType.JoinRoomRequest)
             {
-                if (string.IsNullOrWhiteSpace(msg.RoomId))
+                int room = msg.RoomId; 
+                if(_rooms.AddPeer(room, peer))
                 {
-                    _consoleUI.DisplaySystem("Received JoinRoomRequest with no RoomId.");
-                    return;
-                }
-
-                List<RoomPeerInfo> roomPeers;
-
-                lock (_roomsLock)
-                {
-                    if (!_rooms.ContainsKey(msg.RoomId))
+                    Message response = new Message
                     {
-                        _consoleUI.DisplaySystem($"Join request rejected. Room '{msg.RoomId}' does not exist.");
-                        return;
-                    }
-
-                    RoomPeerInfo? existing = GetRoomMemberByPeerId(msg.RoomId, msg.Sender);
-
-                    if (existing == null)
-                    {
-                        _rooms[msg.RoomId].Add(new RoomPeerInfo
-                        {
-                            PeerId = msg.Sender,
-                            Host = msg.Host ?? "127.0.0.1",
-                            Port = msg.Port
-                        });
-
-                        _consoleUI.DisplaySystem($"Peer {msg.Sender} joined room {msg.RoomId}");
-                    }
-
-                    roomPeers = _rooms[msg.RoomId]
-                        .Select(m => new RoomPeerInfo
-                        {
-                            PeerId = m.PeerId,
-                            Host = m.Host,
-                            Port = m.Port
-                        })
-                        .ToList();
+                        Sender = _myId, 
+                        Type = MessageType.Text,  
+                        Content = $"Added to room {room}.",
+                        TargetPeerId = peer.Id
+                    }; 
+                    _messageQueue.EnqueueOutgoing(response); 
                 }
-
-                Message response = new Message
+                else
                 {
-                    Sender = _myId,
-                    Type = MessageType.JoinRoomResponse,
-                    RoomId = msg.RoomId,
-                    RoomPeers = roomPeers,
-                    TargetPeerId = peer.Id
-                };
-
-                _messageQueue.EnqueueOutgoing(response);
+                    Message response = new Message
+                    {
+                        Sender = _myId,
+                        Type = MessageType.Text,
+                        Content = $"Failed to join room {room}.",
+                        TargetPeerId = peer.Id 
+                    };
+                    _messageQueue.EnqueueOutgoing(response); 
+                }
             }
+            if(msg.Type == MessageType.CreateRoom)
+            {
+                if(_rooms.CreateRoom(msg.RoomId))
+                {
+                    Message response = new Message
+                    {
+                        Sender = _myId,
+                        Type = MessageType.Text,
+                        Content = $"Created room {msg.RoomId}.",
+                        TargetPeerId = peer.Id 
+                    };
+                    _messageQueue.EnqueueOutgoing(response);
+                }
+            }
+            
         };
         _server.OnPeerDisconnected += (peer) => 
         {
-            RemovePeerFromAllRooms(peer.Id);
             _consoleUI.DisplaySystem($"Client disconnected: {peer}");
         };
 
@@ -270,50 +215,12 @@ class Program
             {
                 msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent));
             }
-            if (msg.Type == MessageType.JoinRoomResponse)
-            {
-                if (string.IsNullOrWhiteSpace(msg.RoomId) || msg.RoomPeers == null)
-                {
-                    _consoleUI.DisplaySystem("Received invalid JoinRoomResponse.");
-                    return;}
-                lock (_roomsLock)
-                {
-                    if (!_rooms.ContainsKey(msg.RoomId))
-                        _rooms[msg.RoomId] = new List<RoomPeerInfo>();
-
-                    _rooms[msg.RoomId].Clear();
-
-                    foreach (var roomPeer in msg.RoomPeers)
-                    {
-                        _rooms[msg.RoomId].Add(new RoomPeerInfo
-                        {
-                            PeerId = roomPeer.PeerId,
-                            Host = roomPeer.Host,
-                            Port = roomPeer.Port
-                        });}}
-                _consoleUI.DisplaySystem($"Joined room {msg.RoomId}. Connecting to room peers...");
-                foreach (var roomPeer in msg.RoomPeers)
-                {
-                    if (roomPeer.PeerId == _myId)
-                        continue;
-
-                    if (FindPeerById(roomPeer.PeerId) != null)
-                        continue;
-                    try
-                    {
-                        await _client.ConnectAsync(roomPeer.Host, roomPeer.Port);
-                    }
-                    catch (Exception ex)
-                    {
-                        _consoleUI.DisplaySystem(
-                            $"Failed to connect to room peer {roomPeer.PeerId} at {roomPeer.Host}:{roomPeer.Port} - {ex.Message}"
-                        );}}return;}
             _messageQueue.EnqueueIncoming(msg);
         };
 
         _client.OnDisconnected += (peer) => 
         {
-            RemovePeerFromAllRooms(peer.Id);
+            _rooms.RemovePeerAllRooms(peer);
             _consoleUI.DisplaySystem($"Disconnect from server: {peer}");
         };
 
@@ -443,8 +350,10 @@ class Program
                     break;
                 default:
                     var parsed_input = _consoleUI.ParseCommand(input);
-                    if (!parsed_input.IsCommand) {
-                        Message msg = new Message {
+                    if (!parsed_input.IsCommand) 
+                    {
+                        Message msg = new Message 
+                        {
                             Sender = _myId,
                             Type = MessageType.Text,
                             Content = parsed_input.Message
@@ -464,7 +373,6 @@ class Program
                                 try
                                 {
                                     _server.Start(int.Parse(parsed_input.Args[0]));
-                                    _myListeningPort = int.Parse(parsed_input.Args[0]);
                                 }
                                 catch(Exception e)
                                 {
@@ -491,131 +399,73 @@ class Program
 
                         case CommandType.CreateRoom:
                             {
-                                string roomID = parsed_input.Args[0];
-                                lock(_roomsLock)
+                                int roomID = int.Parse(parsed_input.Args[0]);
+                                Message msg = new Message
                                 {
-                                    if(!_rooms.ContainsKey(roomID))
-                                    {
-                                        _rooms[roomID] = new List<RoomPeerInfo>();
-                                        _rooms[roomID].Add(new RoomPeerInfo
-                                        {
-                                            PeerId = _myId,
-                                            Host = _myHost,
-                                            Port = _myListeningPort
-                                        });
-                                        _consoleUI.DisplaySystem($"Room {roomID} created");
-                                    }
-                                    else
-                                    {
-                                        _consoleUI.DisplaySystem($"Room {roomID} already exists");
-                                    }
-                                }
-                            break;
+                                    Sender = _myId,
+                                    Type = MessageType.CreateRoom,
+                                    RoomId = roomID
+                                };
+                                _messageQueue.EnqueueOutgoing(msg);
+                                break;
                             }
 
                         case CommandType.JoinRoom:
                             {
-                                string roomID = parsed_input.Args[0];
-                                if (_myListeningPort == 0)
-                                {
-                                    _consoleUI.DisplaySystem("You must /listen before joining a room so peers can connect to you.");
-                                    break;
-                                }
+                                int roomID = int.Parse(parsed_input.Args[0]);
                                 Message joinRequest = new Message
                                 {
                                     Sender = _myId,
                                     Type = MessageType.JoinRoomRequest,
-                                    RoomId = roomID,
-                                    Host = _myHost,
-                                    Port = _myListeningPort
+                                    RoomId = roomID
                                 };
                                 _messageQueue.EnqueueOutgoing(joinRequest);
-                                _consoleUI.DisplaySystem($"Requested to join room {roomID}");
                                 break;
                             }
                         case CommandType.LeaveRoom:
                             {
-                                string roomID = parsed_input.Args[0];
-                                lock(_roomsLock)
+                                int roomID = int.Parse(parsed_input.Args[0]);
+                                Message msg = new Message
                                 {
-                                    if(!_rooms.ContainsKey(roomID))
-                                    {
-                                        _consoleUI.DisplaySystem($"Room {roomID} does not exist");
-                                        break;
-                                    }
-                                    int removed = _rooms[roomID].RemoveAll(member => member.PeerId == _myId);
-                                    if (removed > 0)
-                                    {
-                                        _consoleUI.DisplaySystem($"Left room {roomID}");
-                                    }
-                                    else
-                                    {
-                                        _consoleUI.DisplaySystem($"Not in room {roomID}");
-                                    }
-                                }
-                            break;
+                                    Sender = _myId,
+                                    Type = MessageType.LeaveRoom,
+                                    RoomId = roomID 
+                                };
+                                _messageQueue.EnqueueOutgoing(msg);
+                                break;
                             }
 
                         case CommandType.ListRooms:
                             {
-                                lock(_roomsLock)
+                                foreach(var room in _rooms.GetRooms())
                                 {
-                                    if(_rooms.Count == 0)
-                                    {
-                                        _consoleUI.DisplaySystem("No rooms available");
-                                        break;
-                                    }
-                                    foreach(var room in _rooms)
-                                    {
-                                        Console.WriteLine($"{room.Key} ({room.Value.Count} members)");
-                                    }
+                                    Console.WriteLine(room); 
                                 }
                             }
                             break;
 
                         case CommandType.SendToRoom:
                             {
-                                string roomId = parsed_input.Args[0];
+                                int roomId = int.Parse(parsed_input.Args[0]);
                                 string content = string.Join(" ", parsed_input.Args.Skip(1));
-
-                                List<string> roomPeerIds;
-
-                                lock (_roomsLock)
+                                Message msg = new Message 
                                 {
-                                    if (!_rooms.ContainsKey(roomId))
-                                    {
-                                        _consoleUI.DisplaySystem($"Room '{roomId}' does not exist.");
-                                        break;
-                                    }
-                                    roomPeerIds = _rooms[roomId]
-                                        .Select(member => member.PeerId)
-                                        .ToList();
-                                }
-                                if (roomPeerIds.Count == 0)
-                                {
-                                    _consoleUI.DisplaySystem($"Room '{roomId}' is empty.");
-                                    break;
-                                }
-                                foreach (string peerId in roomPeerIds)
-                                {
-                                    if (FindPeerById(peerId) == null)
-                                        continue;
+                                    Sender = _myId,
+                                    Type = MessageType.Text,
+                                    Content = content,
+                                    RoomId = roomId 
 
-                                    Message msg = new Message
-                                    {
-                                        Sender = _myId,
-                                        Type = MessageType.Text,
-                                        Content = content,
-                                        TargetPeerId = peerId
-                                    };
-
-                                    _messageQueue.EnqueueOutgoing(msg);
-                                }
+                                }; 
+                                _messageQueue.EnqueueOutgoing(msg);
+                                break;
+                                
                             }
-                            break;
                         case CommandType.Unknown:
                             Console.WriteLine($"\n{parsed_input.Message}. Please try again!\n");
-                            break;}break;}
+                            break;}break;
+            }
+
+        }
 
         // 1. Cancel the CancellationTokenSource
         // 2. Stop the TcpServer
@@ -635,6 +485,6 @@ class Program
 
         Console.WriteLine("Goodbye!");
     }
-    }
+    
 }
 
