@@ -69,10 +69,10 @@ class Program
     private static string _myId = Guid.NewGuid().ToString();
     private static int _myListeningPort;
     private static string _myHost = "127.0.0.1";
-    private static readonly Dictionary<string, List<RoomMember>> _rooms = new ();
+    private static readonly Dictionary<string, List<RoomPeerInfo>> _rooms = new ();
     private static readonly object _roomsLock = new object();
     // Helper Functions
-    private static RoomMember? GetRoomMemberByPeerId(string roomId, string peerId)
+    private static RoomPeerInfo? GetRoomMemberByPeerId(string roomId, string peerId)
     {
         if (!_rooms.ContainsKey(roomId))
             return null;
@@ -192,11 +192,11 @@ class Program
                         return;
                     }
 
-                    RoomMember? existing = GetRoomMemberByPeerId(msg.RoomId, msg.Sender);
+                    RoomPeerInfo? existing = GetRoomMemberByPeerId(msg.RoomId, msg.Sender);
 
                     if (existing == null)
                     {
-                        _rooms[msg.RoomId].Add(new RoomMember
+                        _rooms[msg.RoomId].Add(new RoomPeerInfo
                         {
                             PeerId = msg.Sender,
                             Host = msg.Host ?? "127.0.0.1",
@@ -239,7 +239,7 @@ class Program
             _consoleUI.DisplaySystem($"Connected to Server: {peer}");
         };
 
-        _client.OnMessageReceived += (peer, msg) => 
+        _client.OnMessageReceived += async (peer, msg) => 
         {
             if (msg.Type == MessageType.KeyExchange ) 
             {
@@ -279,13 +279,13 @@ class Program
                 lock (_roomsLock)
                 {
                     if (!_rooms.ContainsKey(msg.RoomId))
-                        _rooms[msg.RoomId] = new List<RoomMember>();
+                        _rooms[msg.RoomId] = new List<RoomPeerInfo>();
 
                     _rooms[msg.RoomId].Clear();
 
                     foreach (var roomPeer in msg.RoomPeers)
                     {
-                        _rooms[msg.RoomId].Add(new RoomMember
+                        _rooms[msg.RoomId].Add(new RoomPeerInfo
                         {
                             PeerId = roomPeer.PeerId,
                             Host = roomPeer.Host,
@@ -496,14 +496,13 @@ class Program
                                 {
                                     if(!_rooms.ContainsKey(roomID))
                                     {
-                                        _rooms[roomID] = new List<RoomMember>();
-                                        _rooms[roomID].Add(new RoomMember
+                                        _rooms[roomID] = new List<RoomPeerInfo>();
+                                        _rooms[roomID].Add(new RoomPeerInfo
                                         {
                                             PeerId = _myId,
                                             Host = _myHost,
                                             Port = _myListeningPort
                                         });
-                                        _messageQueue.EnqueueOutgoing(joinRequest);
                                         _consoleUI.DisplaySystem($"Room {roomID} created");
                                     }
                                     else
@@ -517,22 +516,23 @@ class Program
                         case CommandType.JoinRoom:
                             {
                                 string roomID = parsed_input.Args[0];
-                                lock(_roomsLock)
+                                if (_myListeningPort == 0)
                                 {
-                                    if(!_rooms.ContainsKey(roomID))
-                                    {
-                                        _consoleUI.DisplaySystem($"Room {roomID} does not exist");
-                                        break;
-                                    }
-                                    
-                                    else
-                                    {
-                                        _consoleUI.DisplaySystem($"Already in room {roomID}");
-                                    }
+                                    _consoleUI.DisplaySystem("You must /listen before joining a room so peers can connect to you.");
+                                    break;
                                 }
-                            break;
+                                Message joinRequest = new Message
+                                {
+                                    Sender = _myId,
+                                    Type = MessageType.JoinRoomRequest,
+                                    RoomId = roomID,
+                                    Host = _myHost,
+                                    Port = _myListeningPort
+                                };
+                                _messageQueue.EnqueueOutgoing(joinRequest);
+                                _consoleUI.DisplaySystem($"Requested to join room {roomID}");
+                                break;
                             }
-
                         case CommandType.LeaveRoom:
                             {
                                 string roomID = parsed_input.Args[0];
@@ -635,6 +635,6 @@ class Program
 
         Console.WriteLine("Goodbye!");
     }
-}
+    }
 }
 
