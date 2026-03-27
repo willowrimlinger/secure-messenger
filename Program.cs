@@ -131,10 +131,56 @@ class Program
             }
             if(msg.Type == MessageType.Text && peer.Aes != null)
             {
-                msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent)); 
-                msg.EncryptedContent = null; 
-                _consoleUI.DisplayMessage(msg);
-                _messageQueue.EnqueueOutgoing(msg);
+                if(peer.CurrentRoom != -1)
+                {
+                    if(msg.RoomId == -1) msg.RoomId = peer.CurrentRoom;
+                    if(!_rooms.RoomExists(msg.RoomId))
+                    {
+                        Message response = new Message
+                        {
+                            Sender = _myId, 
+                            Type = MessageType.Text,  
+                            Content = $"[SERVER] Room {msg.RoomId} doesn't exist. Please create & join room before sending message!",
+                            TargetPeerId = peer.Id
+                        }; 
+                        _messageQueue.EnqueueOutgoing(response);
+                        Console.WriteLine($"User [{peer.Id}] attempted to message non-existent room: [{msg.RoomId}]."); 
+                        return;
+                    }
+                    if(_rooms.ContainsPeer(msg.RoomId, peer))
+                    {
+                        msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent)); 
+                        msg.EncryptedContent = null; 
+                        _consoleUI.DisplayMessage(msg);
+                        _messageQueue.EnqueueOutgoing(msg);
+                    }
+                    else
+                    {
+                        Message response = new Message
+                        {
+                            Sender = _myId, 
+                            Type = MessageType.Text,  
+                            Content = $"[SERVER] You are not connected to room {msg.RoomId}. Please join before sending message!",
+                            TargetPeerId = peer.Id
+                        }; 
+                        _messageQueue.EnqueueOutgoing(response);
+                        Console.WriteLine($"User [{peer.Id}] not connected to room [{msg.RoomId}]. Cannot send message to room"); 
+                        return;
+                    }
+                } 
+                else
+                {
+                    Message response = new Message
+                    {
+                        Sender = _myId, 
+                        Type = MessageType.Text,  
+                        Content = $"[SERVER] You are not part of any rooms. Please join a room to send a message!",
+                        TargetPeerId = peer.Id
+                    }; 
+                    _messageQueue.EnqueueOutgoing(response);
+                    Console.WriteLine($"User [{peer.Id}] not part of any rooms."); 
+                    return;
+                }
             }
             if(msg.Type == MessageType.KeyExchange)
             {
@@ -160,7 +206,8 @@ class Program
                         Content = $"[SERVER] Added to room {room}.",
                         TargetPeerId = peer.Id
                     }; 
-                    _messageQueue.EnqueueOutgoing(response); 
+                    _messageQueue.EnqueueOutgoing(response);
+                    peer.CurrentRoom = room;
                 }
                 else
                 {
@@ -190,8 +237,10 @@ class Program
             }
             if(msg.Type == MessageType.LeaveRoom)
             {
+                Console.WriteLine("Command leave");
                 if(_rooms.RemovePeer(msg.RoomId, peer))
                 {
+                    Console.WriteLine("In remove peer");
                     Message response = new Message
                     {
                         Sender = _myId, 
@@ -199,6 +248,10 @@ class Program
                         Content = $"[SERVER] Left room {msg.RoomId}.",
                         TargetPeerId = peer.Id  
                     };
+                    if(msg.RoomId == peer.CurrentRoom)
+                    {
+                        peer.CurrentRoom = -1;
+                    }
                     _messageQueue.EnqueueOutgoing(response); 
                 }
             }
@@ -545,7 +598,6 @@ class Program
                                     Type = MessageType.Text,
                                     Content = content,
                                     RoomId = roomId 
-
                                 }; 
                                 _messageQueue.EnqueueOutgoing(msg);
                                 break;

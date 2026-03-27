@@ -58,7 +58,7 @@ class Rooms
     public bool RemovePeer(int room, Peer peer)
     {
         if(!RoomExists(room)) return false; 
-        if(ContainsPeer(room, peer)) return false; 
+        if(!ContainsPeer(room, peer)) return false; 
         bool output;
         lock(_lock)
         {
