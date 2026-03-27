@@ -1,4 +1,4 @@
-// Sean Gaines, Alia Ulanbek Kyzy
+// Sean Gaines, Alia Ulanbek Kyzy, Mikey Reizentein
 // CSCI 251 - Secure Distributed Messenger
 
 namespace SecureMessenger.Core;
@@ -11,9 +11,17 @@ public enum MessageType
     KeyExchange,    // Sprint 2: Public key exchange
     SessionKey,     // Sprint 2: Encrypted session key
     Heartbeat,      // Sprint 3: Connection health check
-    PeerDiscovery   // Sprint 3: Peer announcement
+    PeerDiscovery,   // Sprint 3: Peer announcement
+    JoinRoomRequest,
+    JoinRoomResponse
+    
 }
-
+public class RoomPeerInfo
+{
+    public string PeerId { get; set; } = string.Empty;
+    public string Host { get; set; } = string.Empty;
+    public int Port { get; set; }
+}
 /// <summary>
 /// Represents a message in the system
 /// </summary>
@@ -36,6 +44,9 @@ public class Message
     public byte[]? EncryptedContent { get; set; }
     public byte[]? PublicKey { get; set; }
     public string? RoomId { get; set; }
+    public List<RoomPeerInfo>? RoomPeers { get; set; }
+    public string? Host{get; set;}
+    public int Port { get; set; }
 
     // Sprint 3: Target peer for directed messages
     public string? TargetPeerId { get; set; }
@@ -61,7 +72,19 @@ public class Message
         Signature = o.Signature; 
         EncryptedContent = o.EncryptedContent; 
         PublicKey = o.PublicKey; 
+        RoomId = o.RoomId;
+        RoomPeers = o.RoomPeers;
+        Host = o.Host;
+        Port = o.Port;
         TargetPeerId = o.TargetPeerId; 
+        RoomPeers = o.RoomPeers == null 
+            ? null 
+            : new List<RoomPeerInfo>(
+                o.RoomPeers.Select(p => new RoomPeerInfo 
+                { 
+                    PeerId = p.PeerId, Host = p.Host, Port = p.Port 
+                    }));
+
     }
 
     /// <summary> 
