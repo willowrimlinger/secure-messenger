@@ -8,7 +8,7 @@
 - Michael Reizenstein - [Role/Responsibilities]
 - Sean Gaines - [Role/Responsibilities]
 
-**Date:** [Submission Date]
+**Date:** [3/27/26]
 
 ---
 
@@ -50,17 +50,17 @@
 ### Key Generation
 [Describe when and how keys are generated]
 
-- **RSA Key Pair:** [When generated, how stored]
-- **AES Session Key:** [When generated, lifetime]
+- **RSA Key Pair:** Generated once at program startup by each messenger instance using new RsaEncryption(). The public key is exported and shared in KeyExchange messages. The private key appears to remain only inside the running process.
+- **AES Session Key:** Generated after a peer’s public RSA key is learned, using AesEncryption.GenerateKey(). It is encrypted with the peer’s RSA public key, sent in a SessionKey message, and then used for message encryption/decryption with that peer.
 
 ### Key Storage
-[Describe how keys are stored during runtime]
+Each peer instance stores PublicKey, PrivateKey, AESKey and _myRsa everything else is in local variables.
 
 ### Key Lifetime
 | Key Type | Generated When | Expires When |
 |----------|----------------|--------------|
-| RSA Key Pair | | |
-| AES Session Key | | |
+| RSA Key Pair | At program startup | When the program ends |
+| AES Session Key | After a peer public key is recieved | When the peer disconnects |
 
 ---
 
@@ -69,17 +69,20 @@
 ### Message Format
 ```
 [Describe your message format, e.g.:]
-[4 bytes: length][1 byte: type][payload]
+[4 bytes: length][JSON serialized message object]
 ```
 
 ### Message Types
 | Type ID | Name | Description |
 |---------|------|-------------|
-| 0x01 | PUBLIC_KEY | RSA public key exchange |
-| 0x02 | SESSION_KEY | Encrypted AES session key |
-| 0x03 | MESSAGE | Encrypted chat message |
-| 0x04 | SIGNED_MESSAGE | Signed and encrypted message |
-| | | |
+| 0x01 | TEXT | General text |
+| 0x02 | KeyExchange | RSA public key |
+| 0x03 | SessionKey | AES Key | 
+| 0x04 | HeartBeat| connection health check |
+| 0x05 | PeerDiscovery | Announce presence to peers | 
+| 0x06 | CreateRoom | Create a new room | 
+| 0x07 | JoinRoomRequest | Request to join a room |
+
 
 ---
 
