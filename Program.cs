@@ -73,6 +73,8 @@ class Program
     private static Rooms _rooms = new(); 
     private static readonly object _roomsLock = new();
 
+    private static PeerDiscovery _peerDiscovery = new(); 
+
     static async Task Main(string[] args)
     {
         Console.WriteLine("Secure Distributed Messenger");
@@ -119,158 +121,7 @@ class Program
 
         _server.OnMessageReceived += (peer, msg) => 
         {
-            if(peer.PeerRsa != null)
-            {
-                RSA rsa = RSA.Create(2048);
-
-                bool verified = _signer.VerifyData(msg.EncryptedContent, msg.Signature, peer.PublicKey);
-                if(!verified)
-                {
-                    Console.WriteLine($"Failed to validate signature for message: {msg.Id}"); 
-                    return; 
-                }
-            }
-            if(msg.Type == MessageType.Text && peer.Aes != null)
-            {
-                if(peer.CurrentRoom != -1)
-                {
-                    if(msg.RoomId == -1) msg.RoomId = peer.CurrentRoom;
-                    if(!_rooms.RoomExists(msg.RoomId))
-                    {
-                        Message response = new Message
-                        {
-                            Sender = _myId, 
-                            Type = MessageType.Text,  
-                            Content = $"[SERVER] Room {msg.RoomId} doesn't exist. Please create & join room before sending message!",
-                            TargetPeerId = peer.Id
-                        }; 
-                        _messageQueue.EnqueueOutgoing(response);
-                        Console.WriteLine($"User [{peer.Id}] attempted to message non-existent room: [{msg.RoomId}]."); 
-                        return;
-                    }
-                    if(_rooms.ContainsPeer(msg.RoomId, peer))
-                    {
-                        msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent)); 
-                        msg.EncryptedContent = null; 
-                        _consoleUI.DisplayMessage(msg);
-                        _messageQueue.EnqueueOutgoing(msg);
-                    }
-                    else
-                    {
-                        Message response = new Message
-                        {
-                            Sender = _myId, 
-                            Type = MessageType.Text,  
-                            Content = $"[SERVER] You are not connected to room {msg.RoomId}. Please join before sending message!",
-                            TargetPeerId = peer.Id
-                        }; 
-                        _messageQueue.EnqueueOutgoing(response);
-                        Console.WriteLine($"User [{peer.Id}] not connected to room [{msg.RoomId}]. Cannot send message to room"); 
-                        return;
-                    }
-                } 
-                else
-                {
-                    Message response = new Message
-                    {
-                        Sender = _myId, 
-                        Type = MessageType.Text,  
-                        Content = $"[SERVER] You are not part of any rooms. Please join a room to send a message!",
-                        TargetPeerId = peer.Id
-                    }; 
-                    _messageQueue.EnqueueOutgoing(response);
-                    Console.WriteLine($"User [{peer.Id}] not part of any rooms."); 
-                    return;
-                }
-            }
-            if(msg.Type == MessageType.KeyExchange)
-            {
-                peer.PublicKey = msg.PublicKey; 
-                peer.PeerRsa = new RsaEncryption(); 
-                peer.PeerRsa.ImportPublicKey(peer.PublicKey); 
-            }
-            if(msg.Type == MessageType.SessionKey)
-            {
-                byte[] key = _myRsa.DecryptSessionKey(msg.EncryptedContent); 
-                peer.AesKey = key; 
-                peer.Aes = new AesEncryption(peer.AesKey); 
-            }
-            if(msg.Type == MessageType.JoinRoomRequest)
-            {
-                int room = msg.RoomId; 
-                if(_rooms.AddPeer(room, peer))
-                {
-                    Message response = new Message
-                    {
-                        Sender = _myId, 
-                        Type = MessageType.Text,  
-                        Content = $"[SERVER] Added to room {room}.",
-                        TargetPeerId = peer.Id
-                    }; 
-                    _messageQueue.EnqueueOutgoing(response);
-                    peer.CurrentRoom = room;
-                }
-                else
-                {
-                    Message response = new Message
-                    {
-                        Sender = _myId,
-                        Type = MessageType.Text,
-                        Content = $"[SERVER] Failed to join room {room}.",
-                        TargetPeerId = peer.Id 
-                    };
-                    _messageQueue.EnqueueOutgoing(response); 
-                }
-            }
-            if(msg.Type == MessageType.CreateRoom)
-            {
-                if(_rooms.CreateRoom(msg.RoomId))
-                {
-                    Message response = new Message
-                    {
-                        Sender = _myId,
-                        Type = MessageType.Text,
-                        Content = $"[SERVER] Created room {msg.RoomId}.",
-                        TargetPeerId = peer.Id 
-                    };
-                    _messageQueue.EnqueueOutgoing(response);
-                }
-            }
-            if(msg.Type == MessageType.LeaveRoom)
-            {
-                Console.WriteLine("Command leave");
-                if(_rooms.RemovePeer(msg.RoomId, peer))
-                {
-                    Console.WriteLine("In remove peer");
-                    Message response = new Message
-                    {
-                        Sender = _myId, 
-                        Type = MessageType.Text,
-                        Content = $"[SERVER] Left room {msg.RoomId}.",
-                        TargetPeerId = peer.Id  
-                    };
-                    if(msg.RoomId == peer.CurrentRoom)
-                    {
-                        peer.CurrentRoom = -1;
-                    }
-                    _messageQueue.EnqueueOutgoing(response); 
-                }
-            }
-            if(msg.Type == MessageType.GetRooms)
-            {
-                Message response = new Message
-                {
-                    Sender = _myId, 
-                    Type = MessageType.Text,
-                    Content = "",
-                    TargetPeerId = peer.Id 
-                }; 
-                foreach(int room in _rooms.GetRooms())
-                {
-                    response.Content += room + ", "; 
-                }
-                _messageQueue.EnqueueOutgoing(response); 
-            }
+            
             
         };
         _server.OnPeerDisconnected += (peer) => 
@@ -285,53 +136,18 @@ class Program
 
         _client.OnMessageReceived += async (peer, msg) => 
         {
-            if(msg.Sender.Equals(_myId)) return; 
-            if(peer.PeerRsa != null)
-            {
-                bool verified = _signer.VerifyData(msg.EncryptedContent, msg.Signature, peer.PublicKey);
-                if(!verified)
-                {
-                    Console.WriteLine($"Failed to validate signature for message: {msg.Id}"); 
-                    return; 
-                }
-            }
-            if (msg.Type == MessageType.KeyExchange ) 
-            {
-                peer.PublicKey = msg.PublicKey;
-                peer.PeerRsa = new RsaEncryption();
-                peer.PeerRsa.ImportPublicKey(peer.PublicKey);
-                
-
-                peer.AesKey = AesEncryption.GenerateKey();
-                peer.Aes = new AesEncryption(peer.AesKey);
-                byte[] encryptedSessionKey = peer.PeerRsa.EncryptSessionKey(peer.AesKey, peer.PublicKey);
-                Message response = new Message {
-                    Sender = _myId,
-                    Type = MessageType.SessionKey,
-                    EncryptedContent = encryptedSessionKey, 
-                    TargetPeerId = peer.Id
-                }; 
-                response.Signature = _signer.SignData(response.EncryptedContent); 
-                _messageQueue.EnqueueOutgoing(response);
-            }
-            else if (msg.Type == MessageType.SessionKey) 
-            {
-                byte[] decryptedKey = _myRsa.DecryptSessionKey(msg.EncryptedContent);
-                peer.AesKey = decryptedKey;
-                peer.Aes = new AesEncryption(peer.AesKey);
-            }
-
-            if (msg.Type == MessageType.Text && peer.Aes != null)
-            {
-                msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent));
-            }
-            _messageQueue.EnqueueIncoming(msg);
+           
         };
 
         _client.OnDisconnected += (peer) => 
         {
             _rooms.RemovePeerAllRooms(peer);
             _consoleUI.DisplaySystem($"Disconnect from server: {peer}");
+        };
+
+        _peerDiscovery.OnPeerDiscovered += (peer) =>
+        {
+            _consoleUI.DisplaySystem($"Found Peer {peer.Address}:{peer.Port}"); 
         };
 
         // 1. Start a thread/task for processing incoming messages
@@ -364,83 +180,6 @@ class Program
                     Message msg = _messageQueue.DequeueOutgoing();
                     //msg.printLong(); 
 
-                    Peer? peer; 
-                    if(msg.TargetPeerId != null && 
-                       ((peer = _client.GetPeer(msg.TargetPeerId)) != null))
-                    {
-                        if(msg.Type == MessageType.Text)
-                        {
-                            msg.EncryptedContent = peer.Aes.Encrypt(msg.Content);  
-                            msg.Content = ""; 
-                            msg.Signature = _signer.SignData(msg.EncryptedContent); 
-                        }
-                        _ = _client.SendAsync(msg.TargetPeerId, msg); 
-                    }
-                    else
-                    {
-                        foreach(Peer p in _client.GetConnectedPeers())
-                        {
-                            Message send = new(msg); 
-                            if(msg.Type == MessageType.Text)
-                            {
-                                send.EncryptedContent = p.Aes.Encrypt(msg.Content);  
-                                send.Content = ""; 
-                                send.Signature = _signer.SignData(send.EncryptedContent); 
-                            }
-                            _ = _client.SendAsync(p.Id, send); 
-                        }
-                    }
-
-                    if(_server.IsListening) 
-                    {
-                        if(msg.TargetPeerId != null && 
-                        ((peer = _server.GetPeer(msg.TargetPeerId)) != null))
-                        {
-                            if(msg.Type == MessageType.Text)
-                            {
-                                msg.EncryptedContent = peer.Aes.Encrypt(msg.Content);  
-                                msg.Content = ""; 
-                                msg.Signature = _signer.SignData(msg.EncryptedContent); 
-                            }
-                            _ = _server.SendAsync(msg.TargetPeerId, msg); 
-                        }
-                        else if (msg.RoomId != -1)
-                        {
-                            if(_rooms.RoomExists(msg.RoomId)) 
-                            {
-                                foreach(Peer p in _rooms.GetRoom(msg.RoomId))
-                                {
-                                    Message send = new(msg);  
-
-                                    if(msg.Type == MessageType.Text)
-                                    {
-                                        send.EncryptedContent = p.Aes.Encrypt(msg.Content);  
-                                        send.Content = ""; 
-                                        send.Signature = _signer.SignData(send.EncryptedContent); 
-                                    }
-                                    _ = _server.SendAsync(p.Id, send); 
-                                }
-                            }
-                        }
-                        else
-                        {
-                            foreach(Peer p in _server.GetConnectedPeers())
-                            {
-                                if(p.Id.Equals(_myId)) continue; 
-                                Message send = new(msg); 
-
-                                if(msg.Type == MessageType.Text)
-                                {
-                                    send.EncryptedContent = p.Aes.Encrypt(msg.Content);  
-                                    send.Content = ""; 
-                                    send.Signature = _signer.SignData(send.EncryptedContent); 
-                                }
-                                _ = _server.SendAsync(p.Id, send); 
-                            }
-                        }
-                    }
-
-                    
                 }
             }
             catch (OperationCanceledException)
@@ -454,9 +193,10 @@ class Program
         incomingThread.Start();
         outgoingThread.Start();
 
-
         Console.WriteLine("Type /help for available commands");
         Console.WriteLine();
+
+        _peerDiscovery.Start(4500); 
 
         // Main loop - handle user input
         bool running = true;
@@ -502,6 +242,7 @@ class Program
                             break;
 
                         case CommandType.Listen:
+                            /**
                             if (!_server.IsListening) {
                                 try
                                 {
@@ -514,6 +255,8 @@ class Program
                             } else {
                                 _consoleUI.DisplaySystem("Server is already listening");
                             }
+                            **/
+                            //_peerDiscovery.Start(int.Parse(parsed_input.Args[0])); 
                             break;
                         
                         case CommandType.ListPeers:
@@ -533,38 +276,17 @@ class Program
                         case CommandType.CreateRoom:
                             {
                                 int roomID = int.Parse(parsed_input.Args[0]);
-                                Message msg = new Message
-                                {
-                                    Sender = _myId,
-                                    Type = MessageType.CreateRoom,
-                                    RoomId = roomID
-                                };
-                                _messageQueue.EnqueueOutgoing(msg);
                                 break;
                             }
 
                         case CommandType.JoinRoom:
                             {
                                 int roomID = int.Parse(parsed_input.Args[0]);
-                                Message joinRequest = new Message
-                                {
-                                    Sender = _myId,
-                                    Type = MessageType.JoinRoomRequest,
-                                    RoomId = roomID
-                                };
-                                _messageQueue.EnqueueOutgoing(joinRequest);
                                 break;
                             }
                         case CommandType.LeaveRoom:
                             {
                                 int roomID = int.Parse(parsed_input.Args[0]);
-                                Message msg = new Message
-                                {
-                                    Sender = _myId,
-                                    Type = MessageType.LeaveRoom,
-                                    RoomId = roomID 
-                                };
-                                _messageQueue.EnqueueOutgoing(msg);
                                 break;
                             }
 
@@ -579,12 +301,6 @@ class Program
                                 }
                                 else
                                 {
-                                    Message msg = new Message
-                                    {
-                                        Sender = _myId,
-                                        Type = MessageType.GetRooms
-                                    };
-                                    _messageQueue.EnqueueOutgoing(msg); 
                                 }
                             }
                             break;
