@@ -50,8 +50,12 @@ public class PeerDiscovery
     {
         TcpPort = tcpPort; 
         _cancellationTokenSource = new CancellationTokenSource(); 
-        _udpClient = new UdpClient(_broadcastPort); 
-        _udpClient.EnableBroadcast = true; 
+        _udpClient = new UdpClient()
+        {
+            EnableBroadcast = true,
+            ExclusiveAddressUse = false,
+        };
+        _udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, _broadcastPort));
         _listenThread = new Thread(ListenLoop); 
         _listenThread.Start(); 
         _broadcastThread = new Thread(BroadcastLoop); 

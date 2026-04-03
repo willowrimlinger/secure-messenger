@@ -150,6 +150,11 @@ class Program
             _consoleUI.DisplaySystem($"Found Peer {peer.Address}:{peer.Port}"); 
         };
 
+        _peerDiscovery.OnPeerLost += (peer) =>
+        {
+            _consoleUI.DisplaySystem($"Lost Peer {peer.Address}:{peer.Port}"); 
+        };
+
         // 1. Start a thread/task for processing incoming messages
         // 2. Start a thread/task for sending outgoing messages
         // Note: TcpServer.Start() will create its own listen thread
