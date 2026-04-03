@@ -176,7 +176,21 @@ public class PeerDiscovery
     /// </summary>
     private async Task TimeoutCheckLoop()
     {
-        //throw new NotImplementedException("Implement TimeoutCheckLoop() - see TODO in comments above");
+        while(!_cancellationTokenSource!.IsCancellationRequested)
+        {
+            DateTime now = DateTime.Now;
+            int timeout = 30;
+
+            foreach(var peer in GetKnownPeers())
+            {
+                if((now - peer.LastSeen).Seconds > timeout)
+                {
+                    _knownPeers.TryRemove(peer.Id, out _); 
+                    OnPeerLost!(peer);
+                }
+            }
+            Thread.Sleep(5000); 
+        }
     }
 
     /// <summary>
@@ -197,6 +211,9 @@ public class PeerDiscovery
     /// </summary>
     public void Stop()
     {
-        throw new NotImplementedException("Implement Stop() - see TODO in comments above");
+        _cancellationTokenSource!.Cancel(); 
+        _udpClient!.Close();
+        _listenThread!.Join(10000);
+        _broadcastThread!.Join(10000); 
     }
 }
