@@ -60,7 +60,7 @@ public class PeerDiscovery
         _listenThread.Start(); 
         _broadcastThread = new Thread(BroadcastLoop); 
         _broadcastThread.Start(); 
-        _ = TimeoutCheckLoop(); 
+        Task.Run(TimeoutCheckLoop);
     }
 
     /// <summary>

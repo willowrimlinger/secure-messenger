@@ -201,8 +201,6 @@ class Program
         Console.WriteLine("Type /help for available commands");
         Console.WriteLine();
 
-        _peerDiscovery.Start(4500); 
-
         // Main loop - handle user input
         bool running = true;
         while (running)
@@ -247,21 +245,23 @@ class Program
                             break;
 
                         case CommandType.Listen:
-                            /**
-                            if (!_server.IsListening) {
+                            if (!_server.IsListening) 
+                            {
                                 try
                                 {
-                                    _server.Start(int.Parse(parsed_input.Args[0]));
+                                    int port = int.Parse(parsed_input.Args[0]);
+                                    _server.Start(port);
+                                    _peerDiscovery.Start(port);
                                 }
                                 catch(Exception e)
                                 {
                                     _consoleUI.DisplaySystem($"Invalid format {parsed_input.Args[0]}. Port should be a single integer 0-65535"); 
                                 }
-                            } else {
+                            } 
+                            else 
+                            {
                                 _consoleUI.DisplaySystem("Server is already listening");
                             }
-                            **/
-                            //_peerDiscovery.Start(int.Parse(parsed_input.Args[0])); 
                             break;
                         
                         case CommandType.ListPeers:
