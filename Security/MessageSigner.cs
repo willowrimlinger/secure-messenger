@@ -77,8 +77,9 @@ public class MessageSigner
     ///
     /// Security Note: Always reject messages with invalid signatures!
     /// </summary>
-    public bool VerifyData(byte[] data, byte[] signature, byte[] publicKey)
+    public bool VerifyData(byte[] data, byte[]? signature, byte[] publicKey)
     {
+        if(signature == null) return false; 
         try
         {
             using (RSA senderRsa = RSA.Create())

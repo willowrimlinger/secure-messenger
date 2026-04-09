@@ -64,12 +64,11 @@ class Program
     private static TcpClientHandler? _client;
     private static ConsoleUI? _consoleUI;
     private static CancellationTokenSource? _cancellationTokenSource;
-    private static RsaEncryption? _myRsa;
-    private static byte[] _myPublicKey;
+    private static RsaEncryption _myRsa = new RsaEncryption();
+    public readonly static byte[] _myPublicKey = _myRsa.ExportPublicKey();
     private static MessageSigner? _signer; 
 
     // current peer id 
-    private static string _myId = Guid.NewGuid().ToString();
     private static Rooms _rooms = new(); 
     private static readonly object _roomsLock = new();
 
@@ -80,49 +79,35 @@ class Program
         Console.WriteLine("Secure Distributed Messenger");
         Console.WriteLine("============================");
 
-        // 1. Create CancellationTokenSource for shutdown signaling
-        // 2. Create MessageQueue for thread communication
-        // 3. Create ConsoleUI for user interface
-        // 4. Create TcpServer for incoming connections
-        // 5. Create TcpClientHandler for outgoing connections
-
         _messageQueue = new MessageQueue();
         _consoleUI = new ConsoleUI(_messageQueue);
-        _server = new TcpServer();
-        _client = new TcpClientHandler();
+        _server = new TcpServer(_peerDiscovery);
+        _client = new TcpClientHandler(_peerDiscovery);
         _cancellationTokenSource = new CancellationTokenSource();
-        
-
-
-        // 1. TcpServer.OnPeerConnected - handle new incoming connections
-        // 2. TcpServer.OnMessageReceived - handle received messages
-        // 3. TcpServer.OnPeerDisconnected - handle disconnections
-        // 4. TcpClientHandler events (same pattern)
-
-        // Sprint 2:
-
-        _myRsa = new RsaEncryption();
-        _myPublicKey = _myRsa.ExportPublicKey();
-
         _signer = new MessageSigner(_myRsa.GetRSA());
 
+
         _server.OnPeerConnected += (peer) => 
-        { 
-            _consoleUI.DisplaySystem($"Client connected: {peer}");
-            Message keyExchange = new Message
+        {
+            peer.AesKey = AesEncryption.GenerateKey(); 
+            peer.Aes = new AesEncryption(peer.AesKey); 
+            byte[] encryptedKey = _myRsa.EncryptSessionKey(peer.AesKey, peer.PublicKey); 
+            byte[] signature = _signer.SignData(encryptedKey); 
+            Message sessionKey = new Message
             {
-                Sender = _myId, 
-                Type = MessageType.KeyExchange, 
-                PublicKey = _myPublicKey,
+                Sender = _peerDiscovery.LocalPeerId,
+                Type = MessageType.SessionKey,
+                Signature = signature,
+                EncryptedContent = encryptedKey,
                 TargetPeerId = peer.Id
-            }; 
-            _messageQueue.EnqueueOutgoing(keyExchange); 
+            };
+            _messageQueue.EnqueueOutgoing(sessionKey); 
+            _consoleUI.DisplaySystem($"Client connected: {peer}");
         };
 
-        _server.OnMessageReceived += (peer, msg) => 
+        _server.OnMessageReceived += (peer, msg) =>
         {
-            
-            
+            _messageQueue.EnqueueIncoming(msg); 
         };
         _server.OnPeerDisconnected += (peer) => 
         {
@@ -131,18 +116,18 @@ class Program
 
         _client.OnConnected += (peer) =>  
         {
-            _consoleUI.DisplaySystem($"Connected to Server: {peer}");
+            _consoleUI.DisplaySystem($"Connected to Peer: {peer}");
         };
 
         _client.OnMessageReceived += async (peer, msg) => 
         {
-           
+            _messageQueue.EnqueueIncoming(msg); 
         };
 
         _client.OnDisconnected += (peer) => 
         {
             _rooms.RemovePeerAllRooms(peer);
-            _consoleUI.DisplaySystem($"Disconnect from server: {peer}");
+            _consoleUI.DisplaySystem($"Disconnected from Peer: {peer}");
         };
 
         _peerDiscovery.OnPeerDiscovered += (peer) =>
@@ -165,8 +150,52 @@ class Program
                 while (!_cancellationTokenSource!.IsCancellationRequested)
                 {
                     Message msg = _messageQueue.DequeueIncoming(_cancellationTokenSource.Token);
-                    if(msg.Type == MessageType.Text)
-                        _consoleUI.DisplayMessage(msg);
+                    Peer peer = _peerDiscovery.GetPeer(msg.Sender); 
+                    if(peer == null)
+                    {
+                        _consoleUI.DisplaySystem($"Message failed. Peer {peer} not found among known peers."); 
+                        break; 
+                    }
+                    if(peer.PublicKey != null)
+                    {
+                        if(!_signer.VerifyData(msg.EncryptedContent, msg.Signature, peer.PublicKey))
+                            _consoleUI.DisplaySystem($"Message {msg.Id} contains invalid signature, rejecting.");
+                    }
+                    switch(msg.Type)
+                    {
+                        case MessageType.KeyExchange:
+                            if(msg.PublicKey == null)
+                            {
+                                _consoleUI.DisplaySystem($"Key exchange failed. No public key included in message."); 
+                                break; 
+                            }
+                            if(peer.PublicKey != null) break; 
+                            peer.PublicKey = msg.PublicKey;
+                            Message response = new Message
+                            {
+                                Sender = _peerDiscovery.LocalPeerId,
+                                Type = MessageType.KeyExchange,
+                                PublicKey = _myPublicKey,
+                                TargetPeerId = peer.Id,
+                            };
+                            _messageQueue.EnqueueOutgoing(response); 
+                            break;
+                        case MessageType.SessionKey: 
+                            if(peer.PublicKey == null)
+                            {
+                                _consoleUI.DisplaySystem($"Session key sent before public key exchange");
+                                break;
+                            }
+                            byte[] aesKey = _myRsa.DecryptSessionKey(msg.EncryptedContent); 
+                            peer.AesKey = aesKey; 
+                            peer.Aes = new AesEncryption(aesKey);
+                            break;
+
+                        case MessageType.Text: 
+                            msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent)); 
+                            _consoleUI.DisplayMessage(msg);
+                            break; 
+                    }
                 }
             } catch (OperationCanceledException)
             {
@@ -183,8 +212,15 @@ class Program
                 while (!_cancellationTokenSource!.IsCancellationRequested)
                 {
                     Message msg = _messageQueue.DequeueOutgoing();
-                    //msg.printLong(); 
+                    Peer peer = _peerDiscovery.GetPeer(msg.TargetPeerId); 
+                    if(msg.Type == MessageType.Text)
+                    {
+                        msg.EncryptedContent = peer.Aes.Encrypt(msg.Content);
+                        msg.Content = "";
+                        msg.Signature = _signer.SignData(msg.EncryptedContent);
+                    }
 
+                    _ = _client.SendAsync(peer, msg); 
                 }
             }
             catch (OperationCanceledException)
@@ -230,7 +266,7 @@ class Program
                     {
                         Message msg = new Message 
                         {
-                            Sender = _myId,
+                            Sender = _peerDiscovery.LocalPeerId,
                             Type = MessageType.Text,
                             Content = parsed_input.Message
                         }; 
@@ -241,9 +277,12 @@ class Program
                     switch (parsed_input.CommandType)
                     {
                         case CommandType.Connect:
-                            await _client!.ConnectAsync(parsed_input.Args[0], int.Parse(parsed_input.Args[1]));
+                        {
+                            string peerId = parsed_input.Args[0]; 
+                            Peer peer = _peerDiscovery.GetPeer(peerId); 
+                            await _client!.ConnectAsync(peer);
                             break;
-
+                        }
                         case CommandType.Listen:
                             if (!_server.IsListening) 
                             {
@@ -265,7 +304,7 @@ class Program
                             break;
                         
                         case CommandType.ListPeers:
-                            foreach(var peer in _server.GetConnectedPeers())
+                            foreach(var peer in _peerDiscovery.GetKnownPeers())
                             {
                                 Console.WriteLine(peer); 
                             }
@@ -310,18 +349,23 @@ class Program
                             }
                             break;
 
-                        case CommandType.SendToRoom:
+                        case CommandType.Message:
                             {
-                                int roomId = int.Parse(parsed_input.Args[0]);
+                                string dest = parsed_input.Args[0];
                                 string content = string.Join(" ", parsed_input.Args.Skip(1));
-                                Message msg = new Message 
+                                Message msg; 
+                                if(dest[0] == '@')
                                 {
-                                    Sender = _myId,
-                                    Type = MessageType.Text,
-                                    Content = content,
-                                    RoomId = roomId 
-                                }; 
-                                _messageQueue.EnqueueOutgoing(msg);
+                                    msg = new Message 
+                                    {
+                                        Sender = _peerDiscovery.LocalPeerId,
+                                        TargetPeerId = dest[1..],
+                                        Type = MessageType.Text,
+                                        Content = content,
+                                    }; 
+
+                                    _messageQueue.EnqueueOutgoing(msg);
+                                }
                                 break;
                                 
                             }
@@ -343,7 +387,6 @@ class Program
         _messageQueue.CompleteAdding();
 
         _server?.Stop();
-        _client?.DisconnectAll();
 
         incomingThread.Join();
         outgoingThread.Join();

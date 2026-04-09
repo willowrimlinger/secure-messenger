@@ -32,7 +32,7 @@ public class Message
 
     // Sprint 2: Security fields
     public byte[]? Signature { get; set; }
-    public byte[]? EncryptedContent { get; set; }
+    public byte[] EncryptedContent { get; set; } = [];
     public byte[]? PublicKey { get; set; }
     public int RoomId { get; set; } = -1; 
 

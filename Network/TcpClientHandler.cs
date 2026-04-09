@@ -16,12 +16,18 @@ namespace SecureMessenger.Network;
 /// </summary>
 public class TcpClientHandler
 {
-    private readonly Dictionary<string, Peer> _connections = new();
     private readonly object _lock = new();
+
+    private PeerDiscovery _peerDiscovery; 
 
     public event Action<Peer>? OnConnected;
     public event Action<Peer>? OnDisconnected;
     public event Action<Peer, Message>? OnMessageReceived;
+
+    public TcpClientHandler(PeerDiscovery _peerDiscovery)
+    {
+        this._peerDiscovery = _peerDiscovery;
+    }
 
     /// <summary>
     /// Connect to a peer at the specified address and port.
@@ -40,29 +46,32 @@ public class TcpClientHandler
     /// 7. Return true on success
     /// 8. Handle SocketException - print error and return false
     /// </summary>
-    public async Task<bool> ConnectAsync(string host, int port)
+    public async Task<bool> ConnectAsync(Peer peer)
     {
+        if(peer.Address == null || peer.Port == 0)
+        {
+            Console.WriteLine($"Failed to connect to peer {peer}, address or port unknown");
+            return false; 
+        }
+        string host = peer.Address.ToString(); 
+        int port = peer.Port; 
+        
         try
         {
             /// Creates a new TCP client and connects to the host and port given
+            host = peer.Address.ToString(); 
+            port = peer.Port; 
             TcpClient client = new TcpClient();
             await client.ConnectAsync(host, port);
             /// Once connected, get the network stream for communication
             NetworkStream stream = client.GetStream();
-            /// Creates new peer object
-            Peer peer = new Peer
-            {
-                Client = client,
-                Stream = stream,
-                Address = IPAddress.Parse(host),
-                Port = port,
-                IsConnected = true
-            };
-            /// Locking threads to only allow one thread to access the connections dictionary at a time
-            lock (_lock)
-            {
-                _connections[peer.Id] = peer;
-            }
+            
+
+            
+            peer.Client = client;
+            peer.Stream = stream;
+            peer.IsConnected = true; 
+            
             /// Connection event (prevents a null connection)
             OnConnected?.Invoke(peer);
             /// Starts the background task to receive messages from the peer
@@ -165,7 +174,7 @@ public class TcpClientHandler
         }
         finally
         {
-            Disconnect(peer.Id);
+            Disconnect(peer);
         }
     }
 
@@ -178,16 +187,8 @@ public class TcpClientHandler
     ///    - Write the message line asynchronously
     ///    - Flush the writer
     /// </summary>
-    public async Task SendAsync(string peerId, Message message)
+    public async Task SendAsync(Peer peer, Message message)
     {
-        //message.printLong(); 
-        /// Looks up the peer in the connections dictionary
-        Peer? peer;
-        /// Locks threads to only allow one thread to access the connections dictionary at a time
-        lock (_lock)
-        {
-            _connections.TryGetValue(peerId, out peer);
-        }
         /// Sends the message if the peer is connected and has a valid stream
         if (peer != null && peer.IsConnected && peer.Stream != null)
         {
@@ -203,32 +204,13 @@ public class TcpClientHandler
             }
             catch (IOException ex)
             {
-                System.Console.WriteLine($"Error sending to peer {peerId}: {ex.Message}");
-                Disconnect(peerId);
+                System.Console.WriteLine($"Error sending to peer {peer}: {ex.Message}");
+                Disconnect(peer);
             }
         }
         else
         {
-            Console.Write($"Failed to acquire Peer: {peerId}");
-        }
-    }
-
-    /// <summary>
-    /// Broadcast a message to all connected peers.
-    ///
-    /// 1. Get a copy of all peers (with proper locking)
-    /// 2. Loop through each peer and call SendAsync
-    /// </summary>
-    public async Task BroadcastAsync(Message message)
-    {
-        List<Peer> peers;
-        lock (_lock)
-        {
-            peers = _connections.Values.ToList();
-        }
-        foreach (var peer in peers)
-        {
-            await SendAsync(peer.Id, message);
+            Console.Write($"Failed to acquire Peer: {peer}");
         }
     }
 
@@ -241,64 +223,14 @@ public class TcpClientHandler
     ///    - Dispose the Client and Stream
     ///    - Invoke OnDisconnected event
     /// </summary>
-    public void Disconnect(string peerId)
+    public void Disconnect(Peer peer)
     {
-        Peer? peer;
-        lock (_lock)
-        {
-            if (_connections.TryGetValue(peerId, out peer))
-            {
-                _connections.Remove(peerId);
-            }
-        }
         if (peer != null)
         {
             peer.IsConnected = false;
             peer.Client?.Dispose();
             peer.Stream?.Dispose();
             OnDisconnected?.Invoke(peer);
-        }
-    }
-    /// <summary>
-    /// Disconnect from all peers.
-    ///
-    /// 1. loops through all peers; at each peer
-    ///     - disconnect(peer) is called
-    ///
-    /// </summary>
-    public void DisconnectAll()
-    {
-    List<string> peerIds;
-    lock (_lock)
-    {
-        peerIds = _connections.Keys.ToList();
-    }
-
-    foreach (var peerId in peerIds)
-    {
-        Disconnect(peerId);
-    }
-    }
-
-    public Peer? GetPeer(string peerId)
-    {
-        Peer peer; 
-        lock (_lock)
-        {
-            _connections.TryGetValue(peerId, out peer); 
-        }
-        return peer; 
-    }
-
-    /// <summary>
-    /// Get all currently connected peers.
-    /// Remember to use proper locking when accessing _connections.
-    /// </summary>
-    public IEnumerable<Peer> GetConnectedPeers()
-    {
-        lock (_lock)
-        {
-            return _connections.Values.ToList();
         }
     }
 }

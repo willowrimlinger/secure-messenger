@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using SecureMessenger.Core;
 using System.Text.Json; 
 using System.Text;
+using Microsoft.VisualBasic;
 
 namespace SecureMessenger.Network;
 
@@ -17,12 +18,12 @@ namespace SecureMessenger.Network;
 public class TcpServer
 {
     private TcpListener? _listener;
-    private readonly Dictionary<string, Peer> _connectedPeers = new();
     private object _connectedPeersLock = new object();
     private CancellationTokenSource? _cancellationTokenSource;
     private Thread? _listenThread;
     private List<Thread> _receiveThreads = new();
     private object _receiveThreadsLock = new object();
+    private PeerDiscovery _peerDiscovery; 
 
     public event Action<Peer>? OnPeerConnected;
     public event Action<Peer>? OnPeerDisconnected;
@@ -30,6 +31,11 @@ public class TcpServer
 
     public int Port { get; private set; }
     public bool IsListening { get; private set; }
+
+    public TcpServer(PeerDiscovery peerDiscovery)
+    {
+        _peerDiscovery = peerDiscovery; 
+    }
 
     /// <summary>
     /// Start listening for incoming connections on the specified port.
@@ -78,14 +84,14 @@ public class TcpServer
     /// </summary>
     private void ListenLoop()
     {
-        if (this._cancellationTokenSource is null || this._listener is null) {
+        if (_cancellationTokenSource is null || _listener is null) {
             throw new NullReferenceException("Must call Start() before invoking ListenLoop");
         }
-        while (!this._cancellationTokenSource.Token.IsCancellationRequested) {
+        while (!_cancellationTokenSource.Token.IsCancellationRequested) {
             try {
                 if (this._listener.Pending()) {
-                    TcpClient client = this._listener.AcceptTcpClient();
-                    this.HandleNewConnection(client);
+                    TcpClient client = _listener.AcceptTcpClient();
+                    _ = HandleNewConnection(client);
                 } else {
                     Thread.Sleep(100);
                 }
@@ -110,35 +116,122 @@ public class TcpServer
     /// 3. Invoke OnPeerConnected event
     /// 4. Create and start a new Thread running ReceiveLoop for this peer
     /// </summary>
-    private void HandleNewConnection(TcpClient client)
+    private async Task HandleNewConnection(TcpClient client)
     {
         if (client.Client.RemoteEndPoint is null) {
             throw new NullReferenceException("Client must have a remote endpoint assigned");
         }
-        if (this.OnPeerConnected is null) {
+        if (OnPeerConnected is null) {
             throw new NullReferenceException("OnPeerConnected is null");
         }
 
-        // create a port for the server to get track of
-        Peer peer = new Peer();
-        peer.Client = client;
-        peer.Stream = client.GetStream();
-        peer.Address = ((IPEndPoint) client.Client.RemoteEndPoint).Address;
-        peer.Port = ((IPEndPoint) client.Client.RemoteEndPoint).Port;
-        peer.IsConnected = true;
+        Message keyExchange = new Message
+        {
+            Sender = _peerDiscovery.LocalPeerId, 
+            Type = MessageType.KeyExchange, 
+            PublicKey = Program._myPublicKey
+        }; 
 
-        lock (_connectedPeersLock) {
-            this._connectedPeers.Add(peer.Id, peer);
+        Peer peer; 
+        try 
+        {
+            await SendAsync(client, keyExchange);
+            Peer fakePeer = new Peer
+            {
+                Client = client,
+                Stream = client.GetStream(),
+                IsConnected = true
+            }; 
+            Message? message = await ReadMessage(fakePeer);
+            if(message == null)
+                throw new IOException("Failed to read message."); 
+            if(message.Type != MessageType.KeyExchange)
+                throw new IOException("Message of incorrect type."); 
+            if(message.PublicKey == null)
+                throw new IOException("No publickey in message body."); 
+
+            message.printLong(); 
+
+            string peerId = message.Sender; 
+            peer = _peerDiscovery.GetPeer(peerId); 
+
+            peer.Client = client;
+            peer.Stream = client.GetStream();
+            peer.Address = ((IPEndPoint) client.Client.RemoteEndPoint).Address;
+            peer.Port = ((IPEndPoint) client.Client.RemoteEndPoint).Port;
+            peer.IsConnected = true;
+            peer.PublicKey = message.PublicKey; 
+
+            _peerDiscovery.EndpointMap((IPEndPoint) client.Client.RemoteEndPoint, peerId); 
+        }
+        catch(IOException e)
+        {
+            Console.WriteLine($"Key exchange with incomming connection {client} failed. Closing connection.");
+            Console.WriteLine($"Error: {e}");
+            client.Close(); 
+            return;
         }
 
-        this.OnPeerConnected(peer);
+        OnPeerConnected(peer);
         lock (_receiveThreadsLock) {
             // start a receive loop for this specific peer
             Thread receiveThread = new Thread(() => ReceiveLoop(peer));
             // receiveThread.IsBackground = true;
-            this._receiveThreads.Add(receiveThread);
+            _receiveThreads.Add(receiveThread);
             receiveThread.Start(); 
         }
+    }
+
+    private async Task<Message?> ReadMessage(Peer peer)
+    {
+        NetworkStream? reader = peer.Stream; 
+        if(reader == null) 
+            throw new IOException($"Tcp stream for peer {peer} is null"); 
+        byte[] messageLengthBuffer = new byte[4];
+        byte[] byteMessage; 
+
+        int totalBytes = 0; 
+        while(totalBytes < 4)
+        {
+            int bytesRead = await reader.ReadAsync(messageLengthBuffer, totalBytes, 4 - totalBytes);
+            if(bytesRead == 0)
+            {
+                peer.IsConnected = false; 
+                break; 
+            }
+            totalBytes += bytesRead; 
+        }
+        if(!peer.IsConnected)
+            throw new IOException($"Connection lost to Peer {peer}");
+
+        totalBytes = 0; 
+        int length = BitConverter.ToInt32(messageLengthBuffer, 0); 
+
+        byteMessage = new byte[length]; 
+        
+        while(totalBytes < length)
+        {
+            int bytesRead = await reader.ReadAsync(byteMessage, totalBytes, length - totalBytes); 
+            if(bytesRead == 0)
+            {
+                peer.IsConnected = false; 
+                 throw new IOException($"Connection lost to Peer {peer}");
+            }
+            totalBytes += bytesRead; 
+        }
+
+        if(!peer.IsConnected)
+            throw new IOException($"Connection lost to Peer {peer}");
+
+        string line = Encoding.UTF8.GetString(byteMessage, 0, length);
+
+        if (line == null)
+        {
+             throw new IOException($"Encoding of message failed");
+        }
+        /// Creates a new message object with the received content
+        Message? message = JsonSerializer.Deserialize<Message>(line);
+        return message; 
     }
 
     /// <summary>
@@ -153,7 +246,7 @@ public class TcpServer
     /// 7. Handle IOException (connection lost)
     /// 8. In finally block, call DisconnectPeer
     /// </summary>
-    private void ReceiveLoop(Peer peer)
+    private async Task ReceiveLoop(Peer peer)
     {
         if (peer.Stream is null)
             throw new NullReferenceException("Peer does not have a stream to receive from");
@@ -168,63 +261,13 @@ public class TcpServer
         {
             // try to receive a message from this specific peer
             var reader = peer.Stream; 
-
-            byte[] messageLengthBuffer = new byte[4];
-            byte[] byteMessage; 
-
-            while (peer.IsConnected && !this._cancellationTokenSource.Token.IsCancellationRequested) 
+            while(peer.IsConnected && !_cancellationTokenSource.IsCancellationRequested)
             {
-                //Console.WriteLine("Flag");
-                int totalBytes = 0; 
-                /// Reads a line of text asynchronously from the stream
-                while(totalBytes < 4)
-                {
-                    var bytesRead = reader.Read(messageLengthBuffer, totalBytes, 4 - totalBytes);
-                    if(bytesRead == 0)
-                    {
-                        peer.IsConnected = false; 
-                        break; 
-                    }
-                    totalBytes += bytesRead; 
-                }
-
-                if(!peer.IsConnected)
-                    break; 
-
-                totalBytes = 0; 
-                int length = BitConverter.ToInt32(messageLengthBuffer, 0); 
-
-                byteMessage = new byte[length]; 
-                
-                while(totalBytes < length)
-                {
-                    int bytesRead = reader.Read(byteMessage, totalBytes, length - totalBytes); 
-                    if(bytesRead == 0)
-                    {
-                        peer.IsConnected = false; 
-                        break; 
-                    }
-                    totalBytes += bytesRead; 
-                }
-
-                if(!peer.IsConnected)
-                    break; 
-
-                string line = Encoding.UTF8.GetString(byteMessage, 0, length);
-
-                if (line == null)
-                {
-                    break;
-                }
-                /// Creates a new message object with the received content
-                Message message = JsonSerializer.Deserialize<Message>(line);
-                if(message.Sender == "")
-                    message.Sender = $"{peer.Address}:{peer.Port}"; 
-                // if we received a message, call callback
-                // which adds it to the outgoing queue for broadcast to all other peers
-                //this.BroadcastAsync(message); 
-                this.OnMessageReceived(peer, message);
+                Message? message = await ReadMessage(peer); 
+                if(message != null)
+                    OnMessageReceived(peer, message);
             }
+
         } 
         catch (IOException e) 
         {
@@ -232,51 +275,13 @@ public class TcpServer
         } 
         finally 
         {
-            this.DisconnectPeer(peer.Id);
+            this.DisconnectPeer(peer);
         }
     }
 
-    ///<summary> 
-    /// Broadcast a message to all connected peers, except for its source
-    public async Task BroadcastAsync(Message message)
+
+    public async Task SendAsync(Peer peer, Message message)
     {
-        Dictionary<string, Peer> peers; 
-
-        lock(_connectedPeersLock)
-        {
-            peers = new(_connectedPeers); 
-        }
-
-        foreach (var peer in peers)
-        {
-            var receiver = peer.Value; 
-            if (receiver == null || !receiver.IsConnected || receiver.Stream == null) continue; 
-            if ($"{receiver.Address}:{receiver.Port}" == message.Sender) continue; 
-            try
-            {
-                var writer = receiver.Stream; 
-                message.EncryptedContent = receiver.Aes?.Encrypt(message.Content); 
-                message.Content = ""; 
-                byte[] byteMessage = message.ToByteArray(); 
-                await writer.WriteAsync(byteMessage, 0, byteMessage.Length); 
-                writer.FlushAsync(); 
-            }
-            catch (IOException ex)
-            {
-                System.Console.WriteLine($"Error sending message to peer {receiver.Id}: {ex.Message}"); 
-            }
-        }
-    }
-
-    public async Task SendAsync(string peerId, Message message)
-    {
-        /// Looks up the peer in the connections dictionary
-        Peer? peer;
-        /// Locks threads to only allow one thread to access the connections dictionary at a time
-        lock (_connectedPeersLock)
-        {
-            _connectedPeers.TryGetValue(peerId, out peer); 
-        }
         /// Sends the message if the peer is connected and has a valid stream
         if (peer != null && peer.IsConnected && peer.Stream != null)
         {
@@ -292,20 +297,25 @@ public class TcpServer
             }
             catch (IOException ex)
             {
-                System.Console.WriteLine($"Error sending to peer {peerId}: {ex.Message}");
-                DisconnectPeer(peerId);
+                System.Console.WriteLine($"Error sending to peer {peer}: {ex.Message}");
+                DisconnectPeer(peer);
             }
         }
     }
 
-    public Peer? GetPeer(string peerId)
+    public async Task SendAsync(TcpClient client, Message message)
     {
-        Peer? peer;  
-        lock (_connectedPeersLock)
+        /// Sends the message if the peer is connected and has a valid stream
+        if (client != null && client.Connected && client.GetStream() != null)
         {
-            _connectedPeers.TryGetValue(peerId, out peer); 
+            byte[] byteMessage = message.ToByteArray(); 
+            /// Creates a stream writer to send the message to the peer
+            var writer = client.GetStream();
+            /// Writes the message line asynchronously
+            await writer.WriteAsync(byteMessage, 0, byteMessage.Length);
+            /// Flushes the writer to ensure the message is sent
+            await writer.FlushAsync();
         }
-        return peer; 
     }
 
     /// <summary>
@@ -316,40 +326,30 @@ public class TcpServer
     /// 3. Remove the peer from _connectedPeers (with proper locking)
     /// 4. Invoke OnPeerDisconnected event
     /// </summary>
-    private void DisconnectPeer(string peerId)
+    private void DisconnectPeer(Peer peer)
     {
-    Peer? peer = null;
+        if (peer == null)
+            return;
 
-    lock (_connectedPeersLock)
-    {
-        if (_connectedPeers.TryGetValue(peerId, out peer))
+        peer.IsConnected = false;
+
+        try
         {
-            _connectedPeers.Remove(peerId);
+            peer.Stream?.Dispose();
         }
-    }
+        catch
+        {
+        }
 
-    if (peer == null)
-        return;
+        try
+        {
+            peer.Client?.Dispose();
+        }
+        catch
+        {
+        }
 
-    peer.IsConnected = false;
-
-    try
-    {
-        peer.Stream?.Dispose();
-    }
-    catch
-    {
-    }
-
-    try
-    {
-        peer.Client?.Dispose();
-    }
-    catch
-    {
-    }
-
-    OnPeerDisconnected?.Invoke(peer);
+        OnPeerDisconnected?.Invoke(peer);
     }
 
     /// <summary>
@@ -363,44 +363,26 @@ public class TcpServer
     /// </summary>
     public void Stop()
     {
-    _cancellationTokenSource?.Cancel();
+        _cancellationTokenSource?.Cancel();
 
-    try
-    {
-        _listener?.Stop();
-    }
-    catch
-    {
-    }
-
-    IsListening = false;
-
-    List<string> peerIds;
-    lock (_connectedPeersLock)
-    {
-        peerIds = _connectedPeers.Keys.ToList();
-    }
-
-    foreach (var peerId in peerIds)
-    {
-        DisconnectPeer(peerId);
-    }
-
-    if (_listenThread != null && _listenThread.IsAlive)
-    {
-        _listenThread.Join();
-    }
-    }
-
-    /// <summary>
-    /// Get a list of currently connected peers.
-    /// Remember to use proper locking when accessing _connectedPeers.
-    /// </summary>
-    public IEnumerable<Peer> GetConnectedPeers()
-    {
-        lock (_connectedPeersLock)
+        try
         {
-            return _connectedPeers.Values.ToList();
+            _listener?.Stop();
+        }
+        catch
+        {
+        }
+
+        IsListening = false;
+
+        foreach (var peerId in _peerDiscovery.GetKnownPeers())
+        {
+            DisconnectPeer(peerId);
+        }
+
+        if (_listenThread != null && _listenThread.IsAlive)
+        {
+            _listenThread.Join();
         }
     }
 }
