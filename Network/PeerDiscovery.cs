@@ -209,6 +209,11 @@ public class PeerDiscovery
         return _knownPeers.Values.ToList();
     }
 
+    public IEnumerable<string> GetKnownPeerIDs()
+    {
+        return _knownPeers.Keys.ToList(); 
+    }
+
     public Peer GetPeer(string id)
     {
         return _knownPeers[id]; 
@@ -227,6 +232,23 @@ public class PeerDiscovery
     public void UpdatePeer(string id, Peer peer)
     {
         _knownPeers[id] = peer; 
+    }
+
+    public IEnumerable<string> GetConnectedPeerIDS()
+    {
+        return _knownPeers.Keys.Where(item => _knownPeers[item].IsConnected).ToList(); 
+    }
+
+    //Gets all of the peers not within the given array of peers
+    public string[] SetSubtract(string[] peers)
+    {
+        HashSet<string> output = [.. _knownPeers.Keys]; 
+        foreach(var peer in peers)
+        {
+            if(output.Contains(peer))
+                output.Remove(peer); 
+        }
+        return output.ToArray(); 
     }
 
     /// <summary>

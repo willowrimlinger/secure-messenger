@@ -15,6 +15,7 @@ using System.Text.Json;
 using System.Text;
 using System.Net.WebSockets;
 using System.Security.Cryptography;
+using Microsoft.VisualBasic;
 
 namespace SecureMessenger;
 
@@ -74,6 +75,28 @@ class Program
 
     private static PeerDiscovery _peerDiscovery = new(); 
 
+    private static void ForwardMessage(Message msg)
+    {
+
+        string[] forward = 
+            [.. _peerDiscovery.SetSubtract(msg.SeenBy).Where(peer => _peerDiscovery.GetPeer(peer).IsConnected)];
+        if(msg.RoomId > -1 && forward.Length > 0)
+        {
+            forward = [.. forward.Where(peer => _rooms.ContainsPeer(msg.RoomId, peer))]; 
+        }
+        
+        if(forward.Length > 0)
+        {
+
+            //Console.WriteLine($"Forwaring to : {string.Join(", ", forward)}");
+            msg.TargetPeerId = forward; 
+            foreach(var peerID in forward)
+            {
+                _messageQueue.EnqueueOutgoing(msg); 
+            }
+        } 
+    }
+
     static async Task Main(string[] args)
     {
         Console.WriteLine("Secure Distributed Messenger");
@@ -99,7 +122,7 @@ class Program
                 Type = MessageType.SessionKey,
                 Signature = signature,
                 EncryptedContent = encryptedKey,
-                TargetPeerId = peer.Id
+                TargetPeerId = [peer.Id]
             };
             _messageQueue.EnqueueOutgoing(sessionKey); 
             _consoleUI.DisplaySystem($"Client connected: {peer}");
@@ -107,6 +130,8 @@ class Program
 
         _server.OnMessageReceived += (peer, msg) =>
         {
+            if(msg.Source == _peerDiscovery.LocalPeerId) 
+                return; 
             _messageQueue.EnqueueIncoming(msg); 
         };
         _server.OnPeerDisconnected += (peer) => 
@@ -121,12 +146,14 @@ class Program
 
         _client.OnMessageReceived += async (peer, msg) => 
         {
+            if(msg.Source == _peerDiscovery.LocalPeerId) 
+                return; 
             _messageQueue.EnqueueIncoming(msg); 
         };
 
         _client.OnDisconnected += (peer) => 
         {
-            _rooms.RemovePeerAllRooms(peer);
+            _rooms.RemovePeerAllRooms(peer.Id);
             _consoleUI.DisplaySystem($"Disconnected from Peer: {peer}");
         };
 
@@ -176,11 +203,12 @@ class Program
                                 Sender = _peerDiscovery.LocalPeerId,
                                 Type = MessageType.KeyExchange,
                                 PublicKey = _myPublicKey,
-                                TargetPeerId = peer.Id,
+                                TargetPeerId = [peer.Id],
                             };
                             _messageQueue.EnqueueOutgoing(response); 
                             break;
                         case MessageType.SessionKey: 
+                        {
                             if(peer.PublicKey == null)
                             {
                                 _consoleUI.DisplaySystem($"Session key sent before public key exchange");
@@ -189,15 +217,79 @@ class Program
                             byte[] aesKey = _myRsa.DecryptSessionKey(msg.EncryptedContent); 
                             peer.AesKey = aesKey; 
                             peer.Aes = new AesEncryption(aesKey);
+
+                            Message roomSync = new Message
+                            {
+                                Source = _peerDiscovery.LocalPeerId,
+                                Type = MessageType.SyncRoomInformation,
+                                TargetPeerId = [peer.Id],
+                                Content = $"{JsonSerializer.Serialize(_rooms)};SendResponse"
+                            }; 
+                            _messageQueue.EnqueueOutgoing(roomSync); 
                             break;
+                        }
+
+                        case MessageType.SyncRoomInformation:
+                        {
+                            msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent)); 
+                            string[] parts = msg.Content.Split(";"); 
+                            if(parts[1] == "SendResponse")
+                            {
+                                Message roomSync = new Message
+                                {
+                                    Source = _peerDiscovery.LocalPeerId,
+                                    Type = MessageType.SyncRoomInformation,
+                                    TargetPeerId = [peer.Id],
+                                    Content = $"{JsonSerializer.Serialize(_rooms)};NoResponse"
+                                }; 
+                                _messageQueue.EnqueueOutgoing(roomSync); 
+                            }
+                            Rooms otherRooms = JsonSerializer.Deserialize<Rooms>(parts[0]); 
+                            _rooms.Merge(otherRooms); 
+                            break; 
+                        }
 
                         case MessageType.Text: 
                             msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent)); 
                             _consoleUI.DisplayMessage(msg);
+                            if(msg.RoomId != -1) 
+                                ForwardMessage(msg); 
                             break; 
                         case MessageType.CreateRoom:
-                            msg.Content = Encoding.UTF32.GetString(peer.Aes.Decrypt(msg.EncryptedContent));
+                        {
+                            msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent));
+                            int roomnumber = int.Parse(msg.Content); 
+                            _rooms.CreateRoom(roomnumber); 
+                            _consoleUI.DisplaySystem($"{msg.Source} created room {roomnumber}"); 
+                            ForwardMessage(msg); 
                             break;
+                        }
+                        case MessageType.JoinRoom: 
+                        {
+                            msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent));
+                            msg.EncryptedContent = []; 
+                            msg.Signature = [];
+                            int roomnumber = int.Parse(msg.Content); 
+
+                            if(_rooms.ContainsPeer(roomnumber, _peerDiscovery.LocalPeerId))
+                                _consoleUI.DisplaySystem($"{msg.Source} joined room {roomnumber}");
+                            _rooms.AddPeer(roomnumber, msg.Source); 
+                            ForwardMessage(msg); 
+                            break; 
+                        }
+                        case MessageType.LeaveRoom: 
+                        {
+                            msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent));
+                            msg.EncryptedContent = []; 
+                            msg.Signature = [];
+                            int roomnumber = int.Parse(msg.Content); 
+
+                            if(_rooms.ContainsPeer(roomnumber, _peerDiscovery.LocalPeerId))
+                                _consoleUI.DisplaySystem($"{msg.Source} left room {roomnumber}");
+                            _rooms.RemovePeer(roomnumber, msg.Source); 
+                            ForwardMessage(msg); 
+                            break; 
+                        }
                     }
                 }
             } catch (OperationCanceledException)
@@ -215,15 +307,26 @@ class Program
                 while (!_cancellationTokenSource!.IsCancellationRequested)
                 {
                     Message msg = _messageQueue.DequeueOutgoing(_cancellationTokenSource.Token);
-                    Peer peer = _peerDiscovery.GetPeer(msg.TargetPeerId); 
-                    if(msg.Type == MessageType.Text)
-                    {
-                        msg.EncryptedContent = peer.Aes.Encrypt(msg.Content);
-                        msg.Content = "";
-                        msg.Signature = _signer.SignData(msg.EncryptedContent);
-                    }
+                    msg.Sender = _peerDiscovery.LocalPeerId;
 
-                    _ = _client.SendAsync(peer, msg); 
+                    if(msg.TargetPeerId == null)
+                    {
+                        msg.TargetPeerId = _peerDiscovery.GetConnectedPeerIDS().ToArray(); 
+                    }
+                    msg.SeenBy = [.. msg.SeenBy, .. msg.TargetPeerId, _peerDiscovery.LocalPeerId]; 
+                    for(int i = 0; i < msg.TargetPeerId.Length; i++)
+                    {
+                        if(msg.TargetPeerId[i] == _peerDiscovery.LocalPeerId) continue; 
+                        var peer = _peerDiscovery.GetPeer(msg.TargetPeerId[i]);
+                        Message cpy = new Message(msg);
+                        if(msg.Content != string.Empty)
+                        {
+                            cpy.EncryptedContent = peer.Aes.Encrypt(msg.Content);
+                            cpy.Signature = _signer.SignData(cpy.EncryptedContent);
+                        }
+                        cpy.Content = "";
+                        _ = _client.SendAsync(peer, cpy); 
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -323,31 +426,51 @@ class Program
                         case CommandType.CreateRoom:
                             {
                                 int roomID = int.Parse(parsed_input.Args[0]);
+                                Message msg = new Message
+                                {
+                                    Source = _peerDiscovery.LocalPeerId,
+                                    Type = MessageType.CreateRoom,
+                                    Content = $"{roomID}"
+                                };
+                                _rooms.CreateRoom(roomID); 
+                                _messageQueue.EnqueueOutgoing(msg);
                                 break;
                             }
 
                         case CommandType.JoinRoom:
                             {
                                 int roomID = int.Parse(parsed_input.Args[0]);
+                                Message msg = new Message
+                                {
+                                    Source = _peerDiscovery.LocalPeerId, 
+                                    Type = MessageType.JoinRoom,
+                                    Content = $"{roomID}"
+
+                                };
+                                _rooms.AddPeer(roomID, _peerDiscovery.LocalPeerId);
+                                _messageQueue.EnqueueOutgoing(msg); 
+
                                 break;
                             }
                         case CommandType.LeaveRoom:
                             {
                                 int roomID = int.Parse(parsed_input.Args[0]);
+                                Message msg = new Message
+                                {
+                                    Source = _peerDiscovery.LocalPeerId, 
+                                    Type = MessageType.LeaveRoom,
+                                    Content = $"{roomID}"
+                                };
+                                _rooms.RemovePeer(roomID, _peerDiscovery.LocalPeerId); 
+                                _messageQueue.EnqueueOutgoing(msg); 
                                 break;
                             }
 
                         case CommandType.ListRooms:
                             {
-                                if(_server.IsListening) 
+                                foreach(var room in _rooms.GetRooms())
                                 {
-                                    foreach(var room in _rooms.GetRooms())
-                                    {
-                                        Console.WriteLine(room); 
-                                    }
-                                }
-                                else
-                                {
+                                    Console.WriteLine(room); 
                                 }
                             }
                             break;
@@ -361,16 +484,37 @@ class Program
                                 {
                                     msg = new Message 
                                     {
-                                        Sender = _peerDiscovery.LocalPeerId,
-                                        TargetPeerId = dest[1..],
+                                        Source = _peerDiscovery.LocalPeerId,
+                                        TargetPeerId = [ dest[1..] ],
                                         Type = MessageType.Text,
                                         Content = content,
                                     }; 
 
+                                    _consoleUI.DisplayMessage(msg); 
                                     _messageQueue.EnqueueOutgoing(msg);
                                 }
+                                else if(dest[0] == '#')
+                                {
+                                    int roomnumber = int.Parse(dest[1..]);
+                                    if(!_rooms.RoomExists(roomnumber))
+                                    {
+                                        _consoleUI.DisplaySystem($"No such room {roomnumber}"); 
+                                        break; 
+                                    }
+                                    msg = new Message
+                                    {
+                                        Source = _peerDiscovery.LocalPeerId,
+                                        TargetPeerId = [.. _rooms.GetRoom(roomnumber)
+                                            .Where(peer => peer != _peerDiscovery.LocalPeerId && _peerDiscovery.GetPeer(peer).IsConnected)], 
+                                        RoomId = roomnumber, 
+                                        Type = MessageType.Text,
+                                        Content = content,
+                                    };
+
+                                    _consoleUI.DisplayMessage(msg); 
+                                    _messageQueue.EnqueueOutgoing(msg); 
+                                }
                                 break;
-                                
                             }
                         case CommandType.Unknown:
                             Console.WriteLine($"\n{parsed_input.Message}. Please try again!\n");
