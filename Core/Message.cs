@@ -12,6 +12,11 @@ public enum MessageType
     SessionKey,     // Sprint 2: Encrypted session key
     Heartbeat,      // Sprint 3: Connection health check
     PeerDiscovery,   // Sprint 3: Peer announcement
+    CreateRoom,
+    JoinRoom,
+    LeaveRoom, 
+    SyncRoomInformation, 
+     
 }
 /// <summary>
 /// Represents a message in the system

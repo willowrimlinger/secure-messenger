@@ -7,7 +7,6 @@ using System.Net.Sockets;
 using SecureMessenger.Core;
 using System.Text.Json; 
 using System.Text;
-using Microsoft.VisualBasic;
 
 namespace SecureMessenger.Network;
 
@@ -149,8 +148,6 @@ public class TcpServer
                 throw new IOException("Message of incorrect type."); 
             if(message.PublicKey == null)
                 throw new IOException("No publickey in message body."); 
-
-            message.printLong(); 
 
             string peerId = message.Sender; 
             peer = _peerDiscovery.GetPeer(peerId); 

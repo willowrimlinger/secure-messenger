@@ -195,6 +195,9 @@ class Program
                             msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent)); 
                             _consoleUI.DisplayMessage(msg);
                             break; 
+                        case MessageType.CreateRoom:
+                            msg.Content = Encoding.UTF32.GetString(peer.Aes.Decrypt(msg.EncryptedContent));
+                            break;
                     }
                 }
             } catch (OperationCanceledException)
@@ -211,7 +214,7 @@ class Program
             {
                 while (!_cancellationTokenSource!.IsCancellationRequested)
                 {
-                    Message msg = _messageQueue.DequeueOutgoing();
+                    Message msg = _messageQueue.DequeueOutgoing(_cancellationTokenSource.Token);
                     Peer peer = _peerDiscovery.GetPeer(msg.TargetPeerId); 
                     if(msg.Type == MessageType.Text)
                     {
