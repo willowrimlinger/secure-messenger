@@ -496,6 +496,7 @@ class Program
                                 Content = $"{roomID}"
                             };
                             _rooms.AddPeer(roomID, _peerDiscovery.LocalPeerId);
+                                _currentRoom = roomID;
                             _messageQueue.EnqueueOutgoing(msg); 
                             _currentRoom = roomID;
                             _consoleUI.DisplaySystem($"Joined room {roomID}");
@@ -514,6 +515,8 @@ class Program
                                 Content = $"{roomID}"
                             };
                             _rooms.RemovePeer(roomID, _peerDiscovery.LocalPeerId); 
+                                if (_currentRoom == roomID)
+                                    _currentRoom = -1;
                             _messageQueue.EnqueueOutgoing(msg); 
                             if (_currentRoom == roomID)
                                 _currentRoom = -1;
