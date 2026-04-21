@@ -417,6 +417,7 @@ class Program
                             break;
                         
                         case CommandType.History:
+                            
                             break;
 
                         case CommandType.Quit:
