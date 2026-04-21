@@ -214,14 +214,18 @@ public class PeerDiscovery
         return _knownPeers.Keys.ToList(); 
     }
 
-    public Peer GetPeer(string id)
+    public Peer? GetPeer(string id)
     {
-        return _knownPeers[id]; 
+        if(_knownPeers.ContainsKey(id))
+            return _knownPeers[id]; 
+        return null; 
     }
 
-    public Peer GetPeer(IPEndPoint endpoint)
+    public Peer? GetPeer(IPEndPoint endpoint)
     {
-        return _knownPeers[_endpointMap[endpoint]];
+        if(_endpointMap.ContainsKey(endpoint))
+            return _knownPeers[_endpointMap[endpoint]];
+        return null; 
     }
 
     public void EndpointMap(IPEndPoint endpoint, string id)
