@@ -68,12 +68,15 @@ class Program
     private static RsaEncryption _myRsa = new RsaEncryption();
     public readonly static byte[] _myPublicKey = _myRsa.ExportPublicKey();
     private static MessageSigner? _signer; 
+    private static int _currentRoom = -1;
 
     // current peer id 
     private static Rooms _rooms = new(); 
     private static readonly object _roomsLock = new();
 
     private static PeerDiscovery _peerDiscovery = new(); 
+    // sprint 3 - instance of message history 
+    private static MessageHistory _history = new MessageHistory();
 
     private static void ForwardMessage(Message msg)
     {
@@ -252,8 +255,11 @@ class Program
                         case MessageType.Text: 
                             msg.Content = Encoding.UTF8.GetString(peer.Aes.Decrypt(msg.EncryptedContent)); 
                             _consoleUI.DisplayMessage(msg);
-                            if(msg.RoomId != -1) 
-                                ForwardMessage(msg); 
+                            if(msg.RoomId != -1)
+                            {
+                                ForwardMessage(msg);
+                                _history.SaveMessage(msg);
+                            }
                             break; 
                         case MessageType.CreateRoom:
                         {
@@ -417,7 +423,20 @@ class Program
                             break;
                         
                         case CommandType.History:
-                            
+                            if (_currentRoom == -1)
+                            {
+                                Console.WriteLine("Please join a room to view history.");
+                                break;
+                            }
+
+                            var history = _history.GetHistory().Where(m => m.RoomId == _currentRoom).OrderBy(m => m.Timestamp).TakeLast(100);
+
+                            Console.WriteLine($"Room {_currentRoom} History:");
+
+                            foreach (var msg in history)
+                            {
+                                Console.WriteLine(msg.ToString());
+                            }
                             break;
 
                         case CommandType.Quit:
@@ -449,6 +468,7 @@ class Program
 
                                 };
                                 _rooms.AddPeer(roomID, _peerDiscovery.LocalPeerId);
+                                _currentRoom = roomID;
                                 _messageQueue.EnqueueOutgoing(msg); 
 
                                 break;
@@ -463,6 +483,8 @@ class Program
                                     Content = $"{roomID}"
                                 };
                                 _rooms.RemovePeer(roomID, _peerDiscovery.LocalPeerId); 
+                                if (_currentRoom == roomID)
+                                    _currentRoom = -1;
                                 _messageQueue.EnqueueOutgoing(msg); 
                                 break;
                             }
@@ -492,6 +514,7 @@ class Program
                                     }; 
 
                                     _consoleUI.DisplayMessage(msg); 
+                                    _history.SaveMessage(msg);
                                     _messageQueue.EnqueueOutgoing(msg);
                                 }
                                 else if(dest[0] == '#')
@@ -513,6 +536,7 @@ class Program
                                     };
 
                                     _consoleUI.DisplayMessage(msg); 
+                                    _history.SaveMessage(msg);
                                     _messageQueue.EnqueueOutgoing(msg); 
                                 }
                                 break;
