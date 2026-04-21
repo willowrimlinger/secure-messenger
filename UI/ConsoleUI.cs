@@ -44,7 +44,9 @@ public class ConsoleUI
     /// </summary>
     public void DisplaySystem(string message)
     {
+        Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine($"[System] {message}");
+        Console.ResetColor(); 
     }
 
     /// <summary>
