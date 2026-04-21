@@ -108,7 +108,7 @@ class Program
 
         _messageQueue = new MessageQueue();
         _consoleUI = new ConsoleUI(_messageQueue);
-        _server = new TcpServer(_peerDiscovery);
+        _server = new TcpServer(_peerDiscovery, _consoleUI);
         _client = new TcpClientHandler(_peerDiscovery);
         _cancellationTokenSource = new CancellationTokenSource();
         _signer = new MessageSigner(_myRsa.GetRSA());
@@ -163,12 +163,12 @@ class Program
 
         _peerDiscovery.OnPeerDiscovered += (peer) =>
         {
-            _consoleUI.DisplaySystem($"Found Peer {peer.Address}:{peer.Port}"); 
+            _consoleUI.DisplaySystem($"Found Peer {peer.Id} @ {peer.Address}:{peer.Port}"); 
         };
 
         _peerDiscovery.OnPeerLost += (peer) =>
         {
-            _consoleUI.DisplaySystem($"Lost Peer {peer.Address}:{peer.Port}"); 
+            _consoleUI.DisplaySystem($"Lost Peer {peer.Id} @ {peer.Address}:{peer.Port}"); 
         };
 
         // 1. Start a thread/task for processing incoming messages
@@ -320,11 +320,17 @@ class Program
                     {
                         msg.TargetPeerId = _peerDiscovery.GetConnectedPeerIDS().ToArray(); 
                     }
-                    msg.SeenBy = [.. msg.SeenBy, .. msg.TargetPeerId, _peerDiscovery.LocalPeerId]; 
+                    msg.SeenBy = [.. msg.SeenBy!, .. msg.TargetPeerId, _peerDiscovery.LocalPeerId]; 
                     for(int i = 0; i < msg.TargetPeerId.Length; i++)
                     {
                         if(msg.TargetPeerId[i] == _peerDiscovery.LocalPeerId) continue; 
                         var peer = _peerDiscovery.GetPeer(msg.TargetPeerId[i]);
+                        if(peer == null)
+                        {
+                            _consoleUI.DisplaySystem($"Failed to send message. No such peer {msg.TargetPeerId[i]}");
+                            break; 
+                        }
+
                         Message cpy = new Message(msg);
                         if(msg.Content != string.Empty)
                         {

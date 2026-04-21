@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using SecureMessenger.Core;
 using System.Text.Json; 
 using System.Text;
+using SecureMessenger.UI;
 
 namespace SecureMessenger.Network;
 
@@ -24,6 +25,8 @@ public class TcpServer
     private object _receiveThreadsLock = new object();
     private PeerDiscovery _peerDiscovery; 
 
+    private ConsoleUI _consoleUI; 
+
     public event Action<Peer>? OnPeerConnected;
     public event Action<Peer>? OnPeerDisconnected;
     public event Action<Peer, Message>? OnMessageReceived;
@@ -31,9 +34,10 @@ public class TcpServer
     public int Port { get; private set; }
     public bool IsListening { get; private set; }
 
-    public TcpServer(PeerDiscovery peerDiscovery)
+    public TcpServer(PeerDiscovery peerDiscovery, ConsoleUI consoleUI)
     {
         _peerDiscovery = peerDiscovery; 
+        _consoleUI = consoleUI; 
     }
 
     /// <summary>
@@ -57,7 +61,7 @@ public class TcpServer
             this.IsListening = true;
             this._listenThread = new Thread(ListenLoop);
             this._listenThread.Start();
-            Console.WriteLine("Server is listening...");
+            _consoleUI.DisplaySystem("Server is listening...");
         }
         catch (SocketException e)
         {
