@@ -68,6 +68,7 @@ public class ConsoleUI
         Console.WriteLine("  /leave <# room>       - Leave a room");
         Console.WriteLine("  /rooms                - List all rooms");
         Console.WriteLine("  /msg <# room> <msg>   - Send a message to a room");
+        Console.WriteLine("  /msg <@ peer> <msg>   - Send a message to a peer");
         Console.WriteLine();
     }
 
