@@ -1,35 +1,34 @@
 # Sprint 3 Documentation (Final)
 ## Secure Distributed Messenger
 
-**Team Name:** [Your Team Name]
+**Team Name:** Group 5
 
 **Team Members:**
-- [Name 1] - [Role/Responsibilities]
-- [Name 2] - [Role/Responsibilities]
-- [Name 3] - [Role/Responsibilities]
-- [Name 4] - [Role/Responsibilities]
-- [Name 5] - [Role/Responsibilities]
+- Alia Ulanbek Kyzy - [Role/Responsibilities]
+- Michael Reizenstein - [Role/Responsibilities]
+- Sean Gaines - [peer discovery/]
 
-**Date:** [Submission Date]
+**Date:** [4/23/26]
 
 ---
 
 ## Build & Run Instructions
 
 ### Prerequisites
-- [List all required software]
+- n/a
 
 ### Building
 ```
-[Commands to build]
+dotnet build
 ```
 
 ### Running
 ```
-[Commands to run]
+dotnet run
 ```
 
 ### Command Line Arguments
+n/a, project does not require arguments in the command line
 | Argument | Description | Default |
 |----------|-------------|---------|
 | | | |
@@ -45,7 +44,11 @@
 | `/peers` | List known peers | `/peers` |
 | `/history` | View message history | `/history` |
 | `/quit` | Exit application | `/quit` |
-| | | |
+| `/create <# room>` | Create room | `/create 2` |
+| `/join  <# room>` | Join a room | `/join 3` |
+| `/leave  <# room>` | Leave a room | `/leave 3` |
+| `/rooms` |  List all rooms | `/leave 3` |
+| `/msg  <# room> <msg>` | Send a message to a room | `/leave 3` |
 
 ---
 

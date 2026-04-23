@@ -80,7 +80,8 @@ public class PeerDiscovery
     /// </summary>
     private void BroadcastLoop()
     {
-        IPEndPoint iPEndPoint = new(IPAddress.Broadcast, _broadcastPort); 
+        // IPEndPoint iPEndPoint = new(IPAddress.Broadcast, _broadcastPort); 
+        IPEndPoint iPEndPoint = new(IPAddress.Parse("127.0.0.1"), _broadcastPort);
         while(!_cancellationTokenSource!.IsCancellationRequested)
         {
             string discovery = $"PEER:{LocalPeerId}:{TcpPort}";
