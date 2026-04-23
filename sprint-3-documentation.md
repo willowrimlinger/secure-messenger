@@ -48,7 +48,8 @@ n/a, project does not require arguments in the command line
 | `/join  <# room>` | Join a room | `/join 3` |
 | `/leave  <# room>` | Leave a room | `/leave 3` |
 | `/rooms` |  List all rooms | `/leave 3` |
-| `/msg  <# room> <msg>` | Send a message to a room | `/leave 3` |
+| `/msg  <# room> <msg>` | Send a message to a room | `/msg 3 hello` |
+| `/msg  <@ room> <msg>` | Send a message to a peer | `/msg 3` |
 
 ---
 
