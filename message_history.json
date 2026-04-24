@@ -1,0 +1,18 @@
+[
+  {
+    "Id": "a598866a-aaf2-4907-a98c-6d9e2e9b5444",
+    "Sender": "",
+    "Source": "59d6b5a1",
+    "Content": "hello",
+    "Timestamp": "2026-04-23T15:58:14.750476-04:00",
+    "Type": 0,
+    "Signature": null,
+    "EncryptedContent": "",
+    "PublicKey": null,
+    "RoomId": -1,
+    "TargetPeerId": [
+      "7ea685d1"
+    ],
+    "SeenBy": []
+  }
+]
