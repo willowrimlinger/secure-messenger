@@ -239,7 +239,7 @@ class Program
                         _consoleUI.DisplaySystem($"Message failed. Peer {peer} not found among known peers."); 
                         break; 
                     }
-                    if(peer.PublicKey != null)
+                    if(msg.Type != MessageType.Heartbeat && peer.PublicKey != null)
                     {
                         if(!_signer.VerifyData(msg.EncryptedContent, msg.Signature, peer.PublicKey))
                             _consoleUI.DisplaySystem($"Message {msg.Id} contains invalid signature, rejecting.");
