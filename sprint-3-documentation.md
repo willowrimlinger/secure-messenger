@@ -166,55 +166,52 @@ The heartbeat mechanism is used to monitor the health of active peer connections
 ## P2P Architecture
 
 ### Peer Management
-[Describe how peers are tracked and managed]
+Peers are tracked using PeerDiscovery whick keeps a dictionary of known peers indexed by a unique peerId. Each entry stores the peer’s IP address, TCP port, connection state, and last-seen timestamp. Peers are discovered dynamically through UDP broadcasts and updated continuously as new broadcasts are received
 
 ### Connection Strategy
-[Describe how connections are established and maintained]
+The TcpServer listens for incoming connections on a known port, while the TcpClientHandler initiates outgoing connections to discovered peers. When a connection is established, an initial key exchange is performed to share public keys and establish a secure AES session. Each peer maintains its own TCP stream per connection, and communication is handled asynchronously using dedicated receive and send loops running on background threads.
 
 ### Message Routing
-[Describe how messages are routed between peers]
-
+Messages are routed through a central MessageQueue system that decouples user input, networking, and processing. Outgoing messages are first classified by type and optionally scoped to a room.
 ---
 
 ## Resilience Features
 
 ### Failure Detection
-[Describe how connection failures are detected]
+The HeartbeatMonitor tracks the last time a heartbeat was received from each peer and periodically checks whether the elapsed time exceeds a defined timeout. If a peer has not been heard from within the timeout window, it is considered disconnected and a failure event is triggered. In addition, failures are also detected during normal communication—if a TCP read/write operation fails the peer is immediately marked as disconnected.
 
 ### Automatic Reconnection
-[Describe your reconnection strategy]
+When a peer disconnects, it is removed from the active connection set but may still be rediscovered through UDP broadcasts.
 
-- **Initial delay:** [e.g., 1 second]
-- **Backoff strategy:** [e.g., exponential, max 30 seconds]
-- **Max attempts:** [e.g., 5]
+- **Initial delay:** 5 seconds
+- **Backoff strategy:** imploicit
+- **Max attempts:** unlimited
 
 ### Graceful Degradation
-[Describe how the system behaves when peers are unavailable]
-
+When peers become unavailable, the system continues operating with the remaining connected peers without interruption. Messages destined for disconnected peers are simply not delivered, and routing logic avoids sending to inactive connections.
 ---
 
 ## Message History
 
 ### Storage Format
-[Describe how messages are stored locally]
+Messages are stored locally using the MessageHistory component, which maintains an in-memory list of messages and persists them to disk in JSON format. Each time a message is sent or received it is added to this list and written to a file. Storage is thread-safe using a lock to prevent concurrent access issues from multiple threads (incoming, outgoing, UI). Messages include metadata such as sender, timestamp, and RoomId, allowing history to be filtered per room.
 
 ### File Location
-[Where is history stored?]
+message_history.json
 
 ### History Commands
-[How users interact with history]
-
+Users interact with message history through a console command (/history)
 ---
 
 ## User Guide
 
 ### Getting Started
-1. [Step 1: Start the application]
-2. [Step 2: ...]
-3. ...
+1. Build the application : dotnet build
+2. Run the application : dotnet run
+3. Listen on a port : /listen <port>
 
 ### Connecting to Peers
-[Instructions for connecting]
+Run the console command: /connect <ip> <port>
 
 ### Sending Messages
 run /help to see different message commands. To send message to a room, join a room and then type a message without a command. To send a message to a peer or a specific room use the /msg command
@@ -268,9 +265,9 @@ run command /peers to list all peers
 ### Resilience Tests
 | Test | Expected Result | Actual Result | Pass/Fail |
 |------|-----------------|---------------|-----------|
-| Kill peer process | Detected as failed | | |
-| Network interruption | Reconnection attempted | | |
-| Peer rejoins | Connection restored | | |
+| Kill peer process | Detected as failed | | Pass|
+| Network interruption | Reconnection attempted | | Pass|
+| Peer rejoins | Connection restored | | Pass|
 
 ---
 
@@ -284,7 +281,7 @@ run command /peers to list all peers
 
 ## Future Improvements
 
-[What would you improve with more time?]
+We would improve some of the expeption checking. Some of it could be more throrough such as checking every input type, checking responses, etc. With throgouh error checking, we could ensure the program never crashes unexpectedly. 
 
 ---
 
