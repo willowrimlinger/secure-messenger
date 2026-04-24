@@ -62,7 +62,43 @@ public class ReconnectionPolicy
     /// </summary>
     public async Task<bool> TryReconnect(Peer peer)
     {
-        throw new NotImplementedException("Implement TryReconnect() - see TODO in comments above");
+        int attempt = GetAttemptCount(peer.Id);
+        while (attempt < MaxAttempts)
+        {
+            attempt++;
+            _attemptCount[peer.Id] = attempt;
+            Console.WriteLine($"Reconnect attempt {attempt} to peer {peer.Id}...");
+            OnReconnectAttempt?.Invoke(peer.Id, attempt);
+
+            int delayMs = Math.Min(
+                InitialDelayMs * (int)Math.Pow(2, attempt - 1),
+                MaxDelayMs
+            );
+            try
+            {
+                bool connected = await _clientHandler.ConnectAsync(peer);
+
+                if (connected)
+                {
+                    Console.WriteLine($"Successfully reconnected to peer {peer.Id}.");
+                    ResetAttempts(peer.Id);
+                    OnReconnectSuccess?.Invoke(peer.Id);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Reconnect attempt {attempt} failed for peer {peer.Id}: {ex.Message}");
+            }
+
+            if (attempt < MaxAttempts)
+            {
+                await Task.Delay(delayMs);
+            }
+        }
+        Console.WriteLine($"Failed to reconnect to peer {peer.Id} after {MaxAttempts} attempts.");
+        OnReconnectFailed?.Invoke(peer.Id);
+        return false;
     }
 
     /// <summary>
@@ -74,7 +110,7 @@ public class ReconnectionPolicy
     /// </summary>
     public void ResetAttempts(string peerId)
     {
-        throw new NotImplementedException("Implement ResetAttempts() - see TODO in comments above");
+        _attemptCount.TryRemove(peerId, out _);
     }
 
     /// <summary>
@@ -86,6 +122,6 @@ public class ReconnectionPolicy
     /// </summary>
     public int GetAttemptCount(string peerId)
     {
-        throw new NotImplementedException("Implement GetAttemptCount() - see TODO in comments above");
+        return _attemptCount.TryGetValue(peerId, out int count) ? count : 0;
     }
 }
