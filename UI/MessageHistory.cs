@@ -1,4 +1,4 @@
-// [Your Name Here]
+// Alia Ulanbek Kyzy
 // CSCI 251 - Secure Distributed Messenger
 
 using System.Text.Json;
@@ -35,7 +35,8 @@ public class MessageHistory
     /// </summary>
     public MessageHistory(string historyFile = "message_history.json")
     {
-        throw new NotImplementedException("Implement constructor - see TODO in comments above");
+        _historyFile = historyFile;
+        Load();
     }
 
     /// <summary>
@@ -48,7 +49,11 @@ public class MessageHistory
     /// </summary>
     public void SaveMessage(Message message)
     {
-        throw new NotImplementedException("Implement SaveMessage() - see TODO in comments above");
+        lock (_lock)
+        {
+            _messages.Add(message);
+            PersistToFile();
+        }
     }
 
     /// <summary>
@@ -68,7 +73,26 @@ public class MessageHistory
     /// </summary>
     public void Load()
     {
-        throw new NotImplementedException("Implement Load() - see TODO in comments above");
+        try
+        {
+            // quit it doesnt exist
+            if (!File.Exists(_historyFile))
+                return;
+            string json = File.ReadAllText(_historyFile);
+            var loadedData = JsonSerializer.Deserialize<List<Message>>(json);
+
+            if (loadedData != null)
+            {
+                lock (_lock)
+                {
+                    _messages.Clear();
+                    _messages.AddRange(loadedData);
+                }
+            }
+        } catch (Exception ex)
+        {
+            Console.WriteLine($"[History] Failed to load message history: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -85,7 +109,15 @@ public class MessageHistory
     /// </summary>
     private void PersistToFile()
     {
-        throw new NotImplementedException("Implement PersistToFile() - see TODO in comments above");
+        try
+        {
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            string json = JsonSerializer.Serialize(_messages, options);
+            File.WriteAllText(_historyFile, json);
+        } catch (Exception ex)
+        {
+            Console.WriteLine($"[History] Failed to save message history: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -101,7 +133,17 @@ public class MessageHistory
     /// </summary>
     public IEnumerable<Message> GetHistory(int? limit = null)
     {
-        throw new NotImplementedException("Implement GetHistory() - see TODO in comments above");
+        lock (_lock)
+        {
+            IEnumerable<Message> query = _messages.OrderByDescending(x => x.Timestamp);
+
+            if (limit.HasValue)
+            {
+                query = query.Take(limit.Value);
+            }
+
+            return query.ToList();
+        }
     }
 
     /// <summary>
@@ -116,7 +158,17 @@ public class MessageHistory
     /// </summary>
     public void ShowHistory(int limit = 50)
     {
-        throw new NotImplementedException("Implement ShowHistory() - see TODO in comments above");
+        Console.WriteLine($"--- Message History (last {limit} messages) ---");
+
+        // correct order, reverse is first
+        var history = GetHistory(limit).Reverse();
+
+        foreach (var m in history)
+        {
+            Console.WriteLine(m.ToString());
+        }
+
+        Console.WriteLine("--- End of History ---");
     }
 
     /// <summary>
@@ -129,6 +181,14 @@ public class MessageHistory
     /// </summary>
     public void Clear()
     {
-        throw new NotImplementedException("Implement Clear() - see TODO in comments above");
+        lock (_lock)
+        {
+            _messages.Clear();
+
+            if (File.Exists(_historyFile))
+            {
+                File.Delete(_historyFile);
+            }
+        }
     }
 }

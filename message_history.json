@@ -1,0 +1,69 @@
+[
+  {
+    "Id": "f917bb48-762c-4dfc-a688-09914e8281a9",
+    "Sender": "3bbaa6ed",
+    "Source": "",
+    "Content": "hello room 4 from peer 1",
+    "Timestamp": "2026-04-24T14:30:46.944326-04:00",
+    "Type": 0,
+    "Signature": "bDkUMlz6g6DEh1iI9jXNdtTdLQ1xcVs7bmZLm9MxIlqHO7mVcAVciKU3QscdKYpr/tsXg0FLsmYtR0qLMQw3Sb1X/58lTH7Okw+hRJ/hZ0Yqy4f5CsLrtea53anxIy+WYWcZxj4GXE2zsYLxF3UYr/DBW2sGDWJrBAxOv7rb0ceubF7C+mSZ7ewLwBJpgwav60wFP3XleI60l/AOmsZjTVwTXv83qGxbMwJTNOauDa2MlWEsrUtiVxRgfvZ3a9EwhGe4Ld4TG1aXoa5h5kkpxbuMx0RM45Wm8NyaYbzZM0l+MPKUyTaGZHeRVpjWM/gM2ovUoikJU9OwT1CdpTcdWw==",
+    "EncryptedContent": "SqVPdi5znAJfQpXwnHcXLOY08ji6SaIjJbbvuxSRtCM+aMHtVpoiqLfdXlS7ZB8R",
+    "PublicKey": null,
+    "RoomId": 4,
+    "TargetPeerId": [
+      "ab075de3"
+    ],
+    "SeenBy": [
+      "ab075de3",
+      "3bbaa6ed"
+    ]
+  },
+  {
+    "Id": "802983fa-b06a-4615-b722-c4d0e425fa40",
+    "Sender": "fb8961a6",
+    "Source": "",
+    "Content": "hi to room 4 from peer 2",
+    "Timestamp": "2026-04-24T14:34:34.954514-04:00",
+    "Type": 0,
+    "Signature": null,
+    "EncryptedContent": "",
+    "PublicKey": null,
+    "RoomId": 4,
+    "TargetPeerId": [],
+    "SeenBy": [
+      "fb8961a6"
+    ]
+  },
+  {
+    "Id": "47fe1521-642c-4d00-b44e-a85c126766fb",
+    "Sender": "fb8961a6",
+    "Source": "",
+    "Content": "hello room 4",
+    "Timestamp": "2026-04-24T14:34:51.685468-04:00",
+    "Type": 0,
+    "Signature": null,
+    "EncryptedContent": "",
+    "PublicKey": null,
+    "RoomId": 3,
+    "TargetPeerId": [],
+    "SeenBy": [
+      "fb8961a6"
+    ]
+  },
+  {
+    "Id": "292a800c-408d-4333-a8f9-fb2b8b40004b",
+    "Sender": "fb8961a6",
+    "Source": "",
+    "Content": "hello room 3 from peer 2",
+    "Timestamp": "2026-04-24T14:34:58.894147-04:00",
+    "Type": 0,
+    "Signature": null,
+    "EncryptedContent": "",
+    "PublicKey": null,
+    "RoomId": 3,
+    "TargetPeerId": [],
+    "SeenBy": [
+      "fb8961a6"
+    ]
+  }
+]
