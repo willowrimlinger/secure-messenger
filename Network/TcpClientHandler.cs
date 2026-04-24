@@ -23,6 +23,8 @@ public class TcpClientHandler
     public event Action<Peer>? OnConnected;
     public event Action<Peer>? OnDisconnected;
     public event Action<Peer, Message>? OnMessageReceived;
+    private readonly List<Task> _receiveTasks = new();
+    private readonly object _receiveTasksLock = new();
 
     public TcpClientHandler(PeerDiscovery _peerDiscovery)
     {
@@ -75,7 +77,11 @@ public class TcpClientHandler
             /// Connection event (prevents a null connection)
             OnConnected?.Invoke(peer);
             /// Starts the background task to receive messages from the peer
-            _ = Task.Run(() => ReceiveLoop(peer));
+            Task receiveTask = Task.Run(() => ReceiveLoop(peer));
+            lock (_receiveTasksLock)
+            {
+                _receiveTasks.Add(receiveTask);
+            }
             return true;
         }
         /// Handles network errors
@@ -231,6 +237,23 @@ public class TcpClientHandler
             peer.Client?.Dispose();
             peer.Stream?.Dispose();
             OnDisconnected?.Invoke(peer);
+        }
+    }
+    public void WaitForReceiveTasks()
+    {
+        Task[] receiveTasks;
+
+        lock (_receiveTasksLock)
+        {
+            receiveTasks = _receiveTasks.ToArray();
+        }
+
+        try
+        {
+            Task.WaitAll(receiveTasks, TimeSpan.FromSeconds(3));
+        }
+        catch
+        {
         }
     }
 }

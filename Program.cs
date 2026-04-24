@@ -161,11 +161,23 @@ class Program
             _messageQueue.EnqueueIncoming(msg); 
         };
 
-        _client.OnDisconnected += (peer) => 
+        _client.OnDisconnected += async (peer) => 
         {
-            _rooms.RemovePeerAllRooms(peer.Id);
             _heartbeatMonitor.StopMonitoring(peer.Id);
             _consoleUI.DisplaySystem($"Disconnected from Peer: {peer}");
+
+            if (!_cancellationTokenSource!.IsCancellationRequested)
+            {
+                _consoleUI.DisplaySystem($"Attempting reconnect to {peer.Id}...");
+
+                bool success = await _reconnectionPolicy.TryReconnect(peer);
+
+                if (!success)
+                {
+                    _rooms.RemovePeerAllRooms(peer.Id);
+                    _consoleUI.DisplaySystem($"Reconnect failed for {peer.Id}");
+                }
+            }
         };
 
         _peerDiscovery.OnPeerDiscovered += (peer) =>
@@ -214,8 +226,10 @@ class Program
 
                         _messageQueue.EnqueueOutgoing(hb);
                     }
-
-                    Thread.Sleep(_heartbeatMonitor!.HeartbeatInterval);
+                    if (_cancellationTokenSource.Token.WaitHandle.WaitOne(_heartbeatMonitor!.HeartbeatInterval))
+                    {
+                        break;
+                    }
                 }
                 catch
                 {
@@ -226,7 +240,7 @@ class Program
         // 1. Start a thread/task for processing incoming messages
         // 2. Start a thread/task for sending outgoing messages
         // Note: TcpServer.Start() will create its own listen thread
-        var incomingThread = new Thread(() =>
+        Task incomingTask = Task.Run(() =>
         {
             try 
             {
@@ -243,6 +257,7 @@ class Program
                     {
                         if(!_signer.VerifyData(msg.EncryptedContent, msg.Signature, peer.PublicKey))
                             _consoleUI.DisplaySystem($"Message {msg.Id} contains invalid signature, rejecting.");
+                            continue;
                     }
                     switch(msg.Type)
                     {
@@ -359,7 +374,7 @@ class Program
             }
         });
 
-        var outgoingThread = new Thread(() =>
+        Task outgoingTask = Task.Run(async () =>
         {
             try 
             {
@@ -368,30 +383,48 @@ class Program
                     Message msg = _messageQueue.DequeueOutgoing(_cancellationTokenSource.Token);
                     msg.Sender = _peerDiscovery.LocalPeerId;
 
-                    if(msg.TargetPeerId == null)
+                    if (msg.TargetPeerId == null)
                     {
                         msg.TargetPeerId = _peerDiscovery.GetConnectedPeerIDS().ToArray(); 
                     }
+
                     msg.SeenBy = [.. msg.SeenBy!, .. msg.TargetPeerId, _peerDiscovery.LocalPeerId]; 
-                    for(int i = 0; i < msg.TargetPeerId.Length; i++)
+
+                    List<Task> sendTasks = new();
+
+                    for (int i = 0; i < msg.TargetPeerId.Length; i++)
                     {
-                        if(msg.TargetPeerId[i] == _peerDiscovery.LocalPeerId) continue; 
+                        if (msg.TargetPeerId[i] == _peerDiscovery.LocalPeerId)
+                            continue; 
+
                         var peer = _peerDiscovery.GetPeer(msg.TargetPeerId[i]);
-                        if(peer == null)
+
+                        if (peer == null || !peer.IsConnected)
                         {
-                            _consoleUI.DisplaySystem($"Failed to send message. No such peer {msg.TargetPeerId[i]}");
-                            break; 
+                            _consoleUI.DisplaySystem($"Failed to send message. Peer unavailable: {msg.TargetPeerId[i]}");
+                            continue; 
                         }
 
                         Message cpy = new Message(msg);
-                        if(msg.Content != string.Empty)
+
+                        if (msg.Content != string.Empty)
                         {
+                            if (peer.Aes == null)
+                            {
+                                _consoleUI.DisplaySystem($"Cannot encrypt message for {peer.Id}; AES key not established.");
+                                continue;
+                            }
+
                             cpy.EncryptedContent = peer.Aes.Encrypt(msg.Content);
                             cpy.Signature = _signer.SignData(cpy.EncryptedContent);
                         }
+
                         cpy.Content = "";
-                        _ = _client.SendAsync(peer, cpy); 
+
+                        sendTasks.Add(_client.SendAsync(peer, cpy)); 
                     }
+
+                    await Task.WhenAll(sendTasks);
                 }
             }
             catch (OperationCanceledException)
@@ -401,9 +434,6 @@ class Program
             {
             }
         });
-
-        incomingThread.Start();
-        outgoingThread.Start();
 
         Console.WriteLine("Type /help for available commands");
         Console.WriteLine();
@@ -626,9 +656,16 @@ class Program
 
         _server?.Stop();
 
-        incomingThread.Join();
-        outgoingThread.Join();
+        try
+        {
+            await Task.WhenAll(incomingTask, outgoingTask);
+        }
+        catch
+        {
+        }
+
         _heartbeatThread?.Join();
+        _client?.WaitForReceiveTasks();
 
         Console.WriteLine("Goodbye!");
     }

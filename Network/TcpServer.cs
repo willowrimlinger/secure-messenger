@@ -21,8 +21,8 @@ public class TcpServer
     private object _connectedPeersLock = new object();
     private CancellationTokenSource? _cancellationTokenSource;
     private Thread? _listenThread;
-    private List<Thread> _receiveThreads = new();
-    private object _receiveThreadsLock = new object();
+    private readonly List<Task> _receiveTasks = new();
+    private readonly object _receiveTasksLock = new object();
     private PeerDiscovery _peerDiscovery; 
 
     private ConsoleUI _consoleUI; 
@@ -94,7 +94,7 @@ public class TcpServer
             try {
                 if (this._listener.Pending()) {
                     TcpClient client = _listener.AcceptTcpClient();
-                    _ = HandleNewConnection(client);
+                    _ = Task.Run(() => HandleNewConnection(client));
                 } else {
                     Thread.Sleep(100);
                 }
@@ -174,12 +174,12 @@ public class TcpServer
         }
 
         OnPeerConnected(peer);
-        lock (_receiveThreadsLock) {
-            // start a receive loop for this specific peer
-            Thread receiveThread = new Thread(() => ReceiveLoop(peer));
-            // receiveThread.IsBackground = true;
-            _receiveThreads.Add(receiveThread);
-            receiveThread.Start(); 
+
+        Task receiveTask = Task.Run(() => ReceiveLoop(peer));
+
+        lock (_receiveTasksLock)
+        {
+            _receiveTasks.Add(receiveTask);
         }
     }
 
