@@ -111,7 +111,7 @@ public class ConsoleUI
             case "/connect":
             {
                 var args = parts[1..].ToArray(); 
-                if(args.Length < 2)
+                if(args.Length < 1)
                 {
                     Console.WriteLine("Too few arguments for /connect. Usage: /connect [ip] [port]"); 
                     break; 
@@ -207,13 +207,13 @@ public class ConsoleUI
                 var args = parts[1..].ToArray(); 
                 if(args.Length < 2)
                 {
-                    Console.WriteLine("Too few arguments for /msg. Usage: /msg [#room] [message]"); 
+                    Console.WriteLine("Too few arguments for /msg. Usage: /msg [#room|@peer] [message]"); 
                     break; 
                 }
                 return new CommandResult
                 {
                     IsCommand = true, 
-                    CommandType = CommandType.SendToRoom,
+                    CommandType = CommandType.Message,
                     Args = args
                 };
             }
@@ -249,7 +249,7 @@ public enum CommandType
     JoinRoom,
     LeaveRoom,
     ListRooms,
-    SendToRoom
+    Message
 }
 
 /// <summary>

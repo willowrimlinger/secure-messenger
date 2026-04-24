@@ -13,7 +13,7 @@ namespace SecureMessenger.Core;
 /// </summary>
 public class Peer
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString()[..8];
+    public string Id { get; set; } = String.Empty; 
     public string Name { get; set; } = string.Empty;
     public IPAddress? Address { get; set; }
     public int Port { get; set; }
@@ -34,6 +34,6 @@ public class Peer
     public override string ToString()
     {
         var status = IsConnected ? "Connected" : "Disconnected";
-        return $"{Name} ({Address}:{Port}) - {status}";
+        return $"{Id} ({Address}:{Port}) - {status}";
     }
 }

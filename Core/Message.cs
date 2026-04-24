@@ -12,6 +12,11 @@ public enum MessageType
     SessionKey,     // Sprint 2: Encrypted session key
     Heartbeat,      // Sprint 3: Connection health check
     PeerDiscovery,   // Sprint 3: Peer announcement
+    CreateRoom,
+    JoinRoom,
+    LeaveRoom, 
+    SyncRoomInformation, 
+     
 }
 /// <summary>
 /// Represents a message in the system
@@ -20,6 +25,7 @@ public class Message
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Sender { get; set; } = string.Empty;
+    public string Source {get; set; } = string.Empty; 
     public string Content { get; set; } = string.Empty;
     public DateTime Timestamp { get; set; } = DateTime.Now;
 
@@ -32,16 +38,20 @@ public class Message
 
     // Sprint 2: Security fields
     public byte[]? Signature { get; set; }
-    public byte[]? EncryptedContent { get; set; }
+    public byte[] EncryptedContent { get; set; } = [];
     public byte[]? PublicKey { get; set; }
     public int RoomId { get; set; } = -1; 
 
     // Sprint 3: Target peer for directed messages
-    public string? TargetPeerId { get; set; }
+    public string[]? TargetPeerId { get; set; }
+    public string[]? SeenBy {get; set;} = [];
 
     public override string ToString()
     {
-        return $"[{Timestamp:HH:mm:ss}] {Sender}: {Content}";
+        if(RoomId > -1)
+            return $"[{Timestamp:HH:mm:ss}][Room: {RoomId}] {Source}: {Content}";
+        else 
+            return $"[{Timestamp:HH:mm:ss}] {Source}: {Content}";
     }
 
     public void printLong()
@@ -53,6 +63,8 @@ public class Message
 
     public Message(Message o)
     {
+        Id = o.Id; 
+        Source = o.Source;
         Sender = o.Sender; 
         Content = o.Content; 
         Timestamp = o.Timestamp; 
@@ -61,6 +73,8 @@ public class Message
         EncryptedContent = o.EncryptedContent; 
         PublicKey = o.PublicKey; 
         RoomId = o.RoomId;
+        TargetPeerId = o.TargetPeerId;
+        SeenBy = o.SeenBy;
     }
 
     /// <summary> 

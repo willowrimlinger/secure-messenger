@@ -24,6 +24,9 @@ public class PeerDiscovery
     private UdpClient? _udpClient;
     private CancellationTokenSource? _cancellationTokenSource;
     private readonly ConcurrentDictionary<string, Peer> _knownPeers = new();
+
+    //Map IP endpoint to peer id so a peer can be identified by its address + port
+    private readonly ConcurrentDictionary<IPEndPoint, string> _endpointMap = new(); 
     private readonly int _broadcastPort = 5001;
     private Thread? _listenThread;
     private Thread? _broadcastThread;
@@ -140,7 +143,7 @@ public class PeerDiscovery
     {
         var parts = message.Split(":"); 
         string peerId = parts[1]; 
-        string port = parts[2]; 
+        int port = int.Parse(parts[2]); 
 
         if(peerId == LocalPeerId) 
             return; 
@@ -159,9 +162,10 @@ public class PeerDiscovery
             {
                 Id = peerId, 
                 Address = senderAddress,
-                Port = int.Parse(port)
+                Port = port
             };
             _knownPeers.TryAdd(peerId, peer); 
+            _endpointMap[new IPEndPoint(senderAddress, port)] = peerId;
             OnPeerDiscovered!(peer); 
         }
     }
@@ -203,6 +207,48 @@ public class PeerDiscovery
     public IEnumerable<Peer> GetKnownPeers()
     {
         return _knownPeers.Values.ToList();
+    }
+
+    public IEnumerable<string> GetKnownPeerIDs()
+    {
+        return _knownPeers.Keys.ToList(); 
+    }
+
+    public Peer GetPeer(string id)
+    {
+        return _knownPeers[id]; 
+    }
+
+    public Peer GetPeer(IPEndPoint endpoint)
+    {
+        return _knownPeers[_endpointMap[endpoint]];
+    }
+
+    public void EndpointMap(IPEndPoint endpoint, string id)
+    {
+        _endpointMap[endpoint] = id; 
+    }
+
+    public void UpdatePeer(string id, Peer peer)
+    {
+        _knownPeers[id] = peer; 
+    }
+
+    public IEnumerable<string> GetConnectedPeerIDS()
+    {
+        return _knownPeers.Keys.Where(item => _knownPeers[item].IsConnected).ToList(); 
+    }
+
+    //Gets all of the peers not within the given array of peers
+    public string[] SetSubtract(string[] peers)
+    {
+        HashSet<string> output = [.. _knownPeers.Keys]; 
+        foreach(var peer in peers)
+        {
+            if(output.Contains(peer))
+                output.Remove(peer); 
+        }
+        return output.ToArray(); 
     }
 
     /// <summary>
