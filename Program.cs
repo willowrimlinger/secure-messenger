@@ -69,7 +69,9 @@ class Program
     private static RsaEncryption _myRsa = new RsaEncryption();
     public readonly static byte[] _myPublicKey = _myRsa.ExportPublicKey();
     private static MessageSigner? _signer; 
-
+    private static HeartbeatMonitor? _heartbeatMonitor;
+    private static ReconnectionPolicy? _reconnectionPolicy;
+    private static Thread? _heartbeatThread;
     // current peer id 
     private static Rooms _rooms = new(); 
     private static readonly object _roomsLock = new();
@@ -107,8 +109,11 @@ class Program
         _consoleUI = new ConsoleUI(_messageQueue);
         _server = new TcpServer(_peerDiscovery, _consoleUI);
         _client = new TcpClientHandler(_peerDiscovery);
+        _heartbeatMonitor = new HeartbeatMonitor();
+        _reconnectionPolicy = new ReconnectionPolicy(_client);
         _cancellationTokenSource = new CancellationTokenSource();
         _signer = new MessageSigner(_myRsa.GetRSA());
+        _heartbeatMonitor.Start();
 
 
         _server.OnPeerConnected += (peer) => 
@@ -127,6 +132,7 @@ class Program
             };
             _messageQueue.EnqueueOutgoing(sessionKey); 
             _consoleUI.DisplaySystem($"Client connected: {peer}");
+            _heartbeatMonitor.StartMonitoring(peer.Id);
         };
 
         _server.OnMessageReceived += (peer, msg) =>
@@ -137,11 +143,14 @@ class Program
         };
         _server.OnPeerDisconnected += (peer) => 
         {
+            _heartbeatMonitor.StopMonitoring(peer.Id);
             _consoleUI.DisplaySystem($"Client disconnected: {peer}");
         };
 
-        _client.OnConnected += (peer) =>  
+        _client.OnConnected += (peer) =>
         {
+            _heartbeatMonitor.StartMonitoring(peer.Id);
+            _reconnectionPolicy.ResetAttempts(peer.Id);
             _consoleUI.DisplaySystem($"Connected to Peer: {peer}");
         };
 
@@ -155,6 +164,7 @@ class Program
         _client.OnDisconnected += (peer) => 
         {
             _rooms.RemovePeerAllRooms(peer.Id);
+            _heartbeatMonitor.StopMonitoring(peer.Id);
             _consoleUI.DisplaySystem($"Disconnected from Peer: {peer}");
         };
 
@@ -167,7 +177,52 @@ class Program
         {
             _consoleUI.DisplaySystem($"Lost Peer {peer.Id} @ {peer.Address}:{peer.Port}"); 
         };
+        _heartbeatMonitor.OnConnectionFailed += async (peerId) =>
+        {
+            Peer peer = _peerDiscovery.GetPeer(peerId);
 
+            if (peer == null)
+            {
+                _consoleUI.DisplaySystem($"Heartbeat timeout for unknown peer {peerId}");
+                return;
+            }
+
+            _consoleUI.DisplaySystem($"Peer {peerId} timed out. Reconnecting...");
+
+            bool success = await _reconnectionPolicy.TryReconnect(peer);
+
+            if (!success)
+            {
+                _consoleUI.DisplaySystem($"Reconnect failed for {peerId}");
+                _rooms.RemovePeerAllRooms(peerId);
+            }
+        };
+        _heartbeatThread = new Thread(() =>
+        {
+            while (!_cancellationTokenSource!.IsCancellationRequested)
+            {
+                try
+                {
+                    foreach (var peerId in _peerDiscovery.GetConnectedPeerIDS())
+                    {
+                        Message hb = new Message
+                        {
+                            Sender = _peerDiscovery.LocalPeerId,
+                            Type = MessageType.Heartbeat,
+                            TargetPeerId = [peerId]
+                        };
+
+                        _messageQueue.EnqueueOutgoing(hb);
+                    }
+
+                    Thread.Sleep(_heartbeatMonitor!.HeartbeatInterval);
+                }
+                catch
+                {
+                }
+            }
+        });
+        _heartbeatThread.Start();
         // 1. Start a thread/task for processing incoming messages
         // 2. Start a thread/task for sending outgoing messages
         // Note: TcpServer.Start() will create its own listen thread
@@ -191,6 +246,9 @@ class Program
                     }
                     switch(msg.Type)
                     {
+                        case MessageType.Heartbeat:
+                            _heartbeatMonitor.RecordHeartbeat(peer.Id);
+                            break;
                         case MessageType.KeyExchange:
                             if(msg.PublicKey == null)
                             {
@@ -563,13 +621,14 @@ class Program
         // 5. Wait for background threads to finish
 
         _cancellationTokenSource.Cancel();
-
+        _heartbeatMonitor?.Stop();
         _messageQueue.CompleteAdding();
 
         _server?.Stop();
 
         incomingThread.Join();
         outgoingThread.Join();
+        _heartbeatThread?.Join();
 
         Console.WriteLine("Goodbye!");
     }
