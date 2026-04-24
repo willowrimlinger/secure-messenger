@@ -1,4 +1,4 @@
-// [Your Name Here]
+// Michael Reizenstein
 // CSCI 251 - Secure Distributed Messenger
 
 using System.Collections.Concurrent;
